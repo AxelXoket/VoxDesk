@@ -1,0 +1,107 @@
+# ── Python ───────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+dist/
+build/
+*.whl
+*.pyz
+*.pyzw
+sdist/
+
+# ── Virtual Environments ────────────────────────────────────
+venv/
+.venv/
+env/
+ENV/
+.conda/
+
+# ── IDE / Editor ────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.sublime-project
+*.sublime-workspace
+.project
+.classpath
+.settings/
+
+# ── OS ──────────────────────────────────────────────────────
+Thumbs.db
+.DS_Store
+desktop.ini
+ehthumbs.db
+Icon?
+
+# ── Environment / Secrets ───────────────────────────────────
+.env
+.env.*
+*.env
+*.pem
+*.key
+*.cert
+*.p12
+
+# ── Logs ────────────────────────────────────────────────────
+*.log
+logs/
+
+# ── Cache ───────────────────────────────────────────────────
+.cache/
+.pytest_cache/
+.benchmarks/
+.mypy_cache/
+.ruff_cache/
+
+# ── Coverage / Profiling ────────────────────────────────────
+.coverage
+.coverage.*
+htmlcov/
+*.prof
+
+# ── Data / History / User Content ───────────────────────────
+data/
+history/
+exports/
+recordings/
+screenshots/
+
+# ── Model Files (large binaries) ────────────────────────────
+*.bin
+*.pt
+*.pth
+*.onnx
+*.safetensors
+*.gguf
+*.ggml
+*.llamafile
+models/
+weights/
+checkpoints/
+
+# ── Voice / Audio / Media Assets ────────────────────────────
+*.wav
+*.mp3
+*.ogg
+*.flac
+*.aac
+*.m4a
+*.webm
+
+# ── Docker / Container ─────────────────────────────────────
+docker-compose.override.yml
+
+# ── Antigravity / Gemini ────────────────────────────────────
+.gemini/
+.antigravityignore
+
+# ── Misc ────────────────────────────────────────────────────
+*.bak
+*.tmp
+*.temp
+*.orig
+*.swp

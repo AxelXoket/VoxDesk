@@ -1,0 +1,1 @@
+﻿# VoxDesk — Screen Watcher LLM

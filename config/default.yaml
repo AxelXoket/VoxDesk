@@ -1,0 +1,52 @@
+# VoxDesk — Default Configuration
+app:
+  name: "VoxDesk"
+  host: "127.0.0.1"
+  port: 8765
+  debug: false
+
+capture:
+  interval_seconds: 1.0
+  buffer_size: 30        # Last 30 frames (ring buffer)
+  jpeg_quality: 85
+  resize_width: 1920     # Resize before sending to LLM
+
+llm:
+  model: "huihui-ai/minicpm-v4.5-abliterated"
+  fallback_models:
+    - "AliBilge/GLM-4.6V-Flash-abliterated"
+    - "gemma4:e4b"
+  temperature: 0.7
+  max_tokens: 2048
+  context_messages: 10   # Send last N messages as context
+
+tts:
+  engine: "kokoro"
+  voice: "af_heart"
+  speed: 1.0
+  lang_code: "a"         # 'a'=American, 'b'=British
+  enabled: true
+
+stt:
+  engine: "faster-whisper"
+  model: "large-v3-turbo"
+  device: "cuda"
+  compute_type: "float16"
+  language: null          # null = auto-detect
+  vad_enabled: true
+
+voice_activation:
+  enabled: false
+  threshold_db: -30
+
+hotkeys:
+  activate: "ctrl+shift+space"
+  toggle_listen: "ctrl+shift+v"
+  push_to_talk: "ctrl+shift+b"
+
+personality: "voxly"      # Personality file under config/personalities/
+
+history:
+  max_messages: 500
+  auto_save: false        # Enable manually if needed
+  save_path: "./data/history/"

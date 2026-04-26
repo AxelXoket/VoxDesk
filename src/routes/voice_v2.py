@@ -1,0 +1,342 @@
+﻿"""
+VoxDesk — Binary Audio WebSocket Handler
+/ws/voice/v2 — PCM binary transfer protocol.
+
+Receive loop:
+    1. Text frame → JSON dispatch (audio_config, audio_end, audio_cancel)
+    2. Binary frame → PCM decode (only after handshake)
+
+Güvenlik:
+    - Binary before handshake → protocol_error
+    - Oversized frame → protocol_error
+    - Odd byte count → protocol_error
+    - Invalid JSON → protocol_error
+    - Disconnect → clean session close
+    - Legacy base64 path korunur (/ws/voice → eski handler)
+"""
+
+from __future__ import annotations
+
+import base64
+import io
+import json
+import logging
+import asyncio
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+
+from src.audio_protocol import (
+    AudioSession,
+    AudioMessageType,
+    MAX_BASE64_BYTES,
+    validate_config,
+    validate_binary_frame,
+    decode_pcm_s16le,
+    build_config_ack,
+    build_protocol_error,
+)
+
+logger = logging.getLogger("voxdesk.routes.voice_v2")
+
+router = APIRouter(tags=["voice_v2"])
+
+
+@router.websocket("/ws/voice/v2")
+async def ws_voice_v2(websocket: WebSocket):
+    """
+    Binary audio WebSocket — PCM S16LE transfer.
+
+    Protocol:
+        1. Client → audio_config (JSON text frame)
+        2. Server → audio_config_ack (JSON text frame)
+        3. Client → binary PCM frames
+        4. Client → audio_end (JSON text frame)
+        5. Server → STT → LLM → TTS pipeline
+    """
+    from src.main import get_app_state
+
+    state = get_app_state()
+    await state.ws_manager.connect(websocket, "voice_v2")
+
+    session = AudioSession()
+    audio_buffer = bytearray()
+    loop = asyncio.get_event_loop()
+
+    try:
+        while True:
+            message = await websocket.receive()
+
+            # ── Disconnect ───────────────────────────────────
+            if message.get("type") == "websocket.disconnect":
+                break
+
+            # ── Text Frame ───────────────────────────────────
+            if "text" in message:
+                text_data = message["text"]
+                if not text_data or not text_data.strip():
+                    await websocket.send_json(
+                        build_protocol_error("Boş text frame", "empty_frame")
+                    )
+                    continue
+
+                try:
+                    data = json.loads(text_data)
+                except (json.JSONDecodeError, ValueError):
+                    await websocket.send_json(
+                        build_protocol_error("Geçersiz JSON", "invalid_json")
+                    )
+                    continue
+
+                msg_type = data.get("type", "")
+
+                # ── audio_config (handshake) ─────────────────
+                if msg_type == AudioMessageType.AUDIO_CONFIG.value:
+                    config, err = validate_config(data)
+                    if err:
+                        await websocket.send_json(
+                            build_protocol_error(err, "invalid_config")
+                        )
+                        continue
+
+                    session.accept_handshake(config)
+                    await websocket.send_json(build_config_ack(config))
+                    logger.debug(
+                        f"Audio handshake OK — "
+                        f"v{config.protocol_version}, "
+                        f"{config.sample_rate}Hz"
+                    )
+                    continue
+
+                # ── audio_end ────────────────────────────────
+                if msg_type == AudioMessageType.AUDIO_END.value:
+                    if not session.handshake_done:
+                        await websocket.send_json(
+                            build_protocol_error(
+                                "audio_end — handshake yapılmamış",
+                                "no_handshake"
+                            )
+                        )
+                        continue
+
+                    # Buffer'daki audio'yu işle
+                    if audio_buffer:
+                        await _process_audio_buffer(
+                            websocket, state, loop,
+                            bytes(audio_buffer), session
+                        )
+                        audio_buffer.clear()
+                    else:
+                        await websocket.send_json({"type": "stt_empty"})
+
+                    session.reset()
+                    continue
+
+                # ── audio_cancel ─────────────────────────────
+                if msg_type == AudioMessageType.AUDIO_CANCEL.value:
+                    audio_buffer.clear()
+                    session.reset()
+                    logger.debug("Audio cancel — buffer temizlendi")
+                    await websocket.send_json({"type": "audio_cancelled"})
+                    continue
+
+                # ── legacy base64 audio ──────────────────────
+                if msg_type == "audio":
+                    await _handle_legacy_audio(
+                        websocket, state, loop, data
+                    )
+                    continue
+
+                # ── Bilinmeyen type ──────────────────────────
+                await websocket.send_json(
+                    build_protocol_error(
+                        f"Bilinmeyen message type: {msg_type}",
+                        "unknown_type"
+                    )
+                )
+                continue
+
+            # ── Binary Frame ─────────────────────────────────
+            if "bytes" in message:
+                binary_data = message["bytes"]
+
+                # Handshake kontrolü
+                if not session.handshake_done:
+                    await websocket.send_json(
+                        build_protocol_error(
+                            "Binary frame — önce audio_config gönder",
+                            "binary_before_handshake"
+                        )
+                    )
+                    continue
+
+                # Frame validation
+                valid, err = validate_binary_frame(binary_data)
+                if not valid:
+                    await websocket.send_json(
+                        build_protocol_error(err, "invalid_frame")
+                    )
+                    continue
+
+                # Buffer'a ekle + sequence güncelle
+                audio_buffer.extend(binary_data)
+                session.record_chunk(len(binary_data))
+                continue
+
+    except WebSocketDisconnect:
+        logger.debug(f"Voice v2 disconnect — {session.total_chunks} chunks")
+    except Exception as e:
+        logger.error(f"WS voice v2 hatası: {e}")
+    finally:
+        state.ws_manager.disconnect(websocket, "voice_v2")
+
+
+# ── Audio Processing Pipeline ────────────────────────────────
+
+async def _process_audio_buffer(
+    websocket: WebSocket,
+    state,
+    loop: asyncio.AbstractEventLoop,
+    audio_bytes: bytes,
+    session: AudioSession,
+) -> None:
+    """Buffered PCM audio → STT → LLM → TTS pipeline."""
+    import numpy as np
+
+    # PCM decode
+    audio_array = decode_pcm_s16le(audio_bytes)
+
+    if len(audio_array) < 4800:  # < 0.3s
+        await websocket.send_json({"type": "stt_empty"})
+        return
+
+    # STT (blocking → executor)
+    result = await loop.run_in_executor(
+        None, state.stt.transcribe_audio, audio_array
+    )
+    text = result.get("text", "")
+    lang = result.get("language", "unknown")
+
+    if not text.strip():
+        await websocket.send_json({"type": "stt_empty"})
+        return
+
+    await websocket.send_json({
+        "type": "stt_result",
+        "text": text,
+        "language": lang,
+    })
+
+    # LLM — async, non-blocking
+    image_bytes = None
+    if state.capture:
+        frame = state.capture.get_latest_frame()
+        if frame:
+            image_bytes = frame.image_bytes
+
+    llm_response = await state.llm.chat(text, image_bytes)
+
+    await websocket.send_json({
+        "type": "llm_response",
+        "text": llm_response,
+    })
+
+    # TTS — streaming, executor'da çalışır
+    if state.tts and state.tts.enabled:
+        import soundfile as sf
+
+        def _produce_tts_chunks():
+            chunks = []
+            for chunk in state.tts.synthesize_stream(llm_response):
+                buf = io.BytesIO()
+                sf.write(buf, chunk, state.tts.sample_rate, format="WAV")
+                chunks.append(base64.b64encode(buf.getvalue()).decode())
+            return chunks
+
+        tts_chunks = await loop.run_in_executor(None, _produce_tts_chunks)
+        for chunk_b64 in tts_chunks:
+            await websocket.send_json({
+                "type": "tts_audio",
+                "audio": chunk_b64,
+            })
+
+
+# ── Legacy Base64 Handler ────────────────────────────────────
+
+async def _handle_legacy_audio(
+    websocket: WebSocket,
+    state,
+    loop: asyncio.AbstractEventLoop,
+    data: dict,
+) -> None:
+    """
+    Legacy base64 audio path — geriye dönük uyumluluk.
+    enable_binary_audio=false iken bu path kullanılır.
+    """
+    audio_b64 = data.get("audio", "")
+    audio_format = data.get("format", "webm")
+
+    # Base64 size limit
+    if len(audio_b64) > MAX_BASE64_BYTES:
+        await websocket.send_json(
+            build_protocol_error(
+                f"Base64 audio çok büyük: {len(audio_b64)} bytes",
+                "oversized_base64"
+            )
+        )
+        return
+
+    try:
+        audio_bytes = base64.b64decode(audio_b64)
+    except Exception:
+        await websocket.send_json(
+            build_protocol_error("Base64 decode hatası", "invalid_base64")
+        )
+        return
+
+    # Import route-local decode functions
+    from src.routes.chat import _decode_audio_webm, _decode_audio_raw_pcm
+
+    if audio_format == "pcm":
+        audio_array = _decode_audio_raw_pcm(audio_bytes)
+    else:
+        audio_array = await loop.run_in_executor(
+            None, _decode_audio_webm, audio_bytes
+        )
+
+    if audio_array is None or len(audio_array) < 4800:
+        await websocket.send_json({"type": "stt_empty"})
+        return
+
+    # Delegate to shared pipeline
+    from src.audio_protocol import AudioSession
+    temp_session = AudioSession()
+    temp_session.accept_handshake(
+        __import__("src.audio_protocol", fromlist=["AudioConfig"]).AudioConfig()
+    )
+
+    result = await loop.run_in_executor(
+        None, state.stt.transcribe_audio, audio_array
+    )
+    text = result.get("text", "")
+
+    if not text.strip():
+        await websocket.send_json({"type": "stt_empty"})
+        return
+
+    await websocket.send_json({
+        "type": "stt_result",
+        "text": text,
+        "language": result.get("language", "unknown"),
+    })
+
+    # LLM
+    image_bytes = None
+    if state.capture:
+        frame = state.capture.get_latest_frame()
+        if frame:
+            image_bytes = frame.image_bytes
+
+    llm_response = await state.llm.chat(text, image_bytes)
+    await websocket.send_json({
+        "type": "llm_response",
+        "text": llm_response,
+    })
