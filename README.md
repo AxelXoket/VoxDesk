@@ -4,10 +4,12 @@
     <strong>Local-only AI desktop assistant with real-time screen analysis and voice interaction</strong>
   </p>
   <p align="center">
-    <img src="https://img.shields.io/badge/python-3.12+-blue?style=flat-square&logo=python" alt="Python">
-    <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License">
-    <img src="https://img.shields.io/badge/status-v0.1.0-orange?style=flat-square" alt="Status">
-    <img src="https://img.shields.io/badge/privacy-100%25_local-brightgreen?style=flat-square&logo=shield" alt="Privacy">
+    <img src="https://img.shields.io/badge/python-3.12+-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python">
+    <img src="https://img.shields.io/badge/license-GPL--3.0-blue?style=flat-square" alt="License">
+    <img src="https://img.shields.io/badge/version-0.1.0-orange?style=flat-square" alt="Version">
+    <img src="https://img.shields.io/badge/privacy-100%25_local-brightgreen?style=flat-square" alt="Privacy">
+    <img src="https://img.shields.io/badge/tests-348_passed-success?style=flat-square" alt="Tests">
+    <img src="https://img.shields.io/badge/coverage-65%25-yellowgreen?style=flat-square" alt="Coverage">
   </p>
 </p>
 
@@ -236,7 +238,7 @@ tts:
 
 ## License
 
-This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
+This project is licensed under the GNU General Public License v3.0 — see the [LICENSE](LICENSE) file for details.
 
 ---
 
