@@ -1,4 +1,4 @@
-﻿"""
+"""
 VoxDesk — Speech-to-Text Module
 faster-whisper ile Türkçe+İngilizce ses tanıma.
 Push-to-talk, toggle continuous, voice activation destekli.
@@ -60,24 +60,6 @@ class SpeechRecognizer:
             unload_cooldown_seconds=unload_cooldown_seconds,
             keep_warm=keep_warm,
         )
-
-    def _init_model(self):
-        """Whisper modelini yükle (lokal dosyadan)."""
-        if self._model is not None:
-            return
-
-        try:
-            from faster_whisper import WhisperModel
-
-            self._model = WhisperModel(
-                self.model_name,
-                device=self.device,
-                compute_type=self.compute_type,
-            )
-            logger.info(f"✅ Whisper modeli yüklendi: {self.model_name} ({self.device})")
-        except Exception as e:
-            logger.error(f"❌ Whisper model yüklenemedi: {e}")
-            raise
 
     def transcribe_audio(self, audio_data: np.ndarray) -> dict:
         """

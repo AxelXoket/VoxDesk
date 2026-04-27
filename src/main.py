@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import time
+import tomllib
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -28,6 +29,11 @@ from src.tts import VoiceSynth
 from src.websocket_manager import ConnectionManager
 from src.hotkey import HotkeyManager
 from src.tray import TrayIcon
+
+# Version — single source from pyproject.toml
+_pyproject = Path(__file__).parent.parent / "pyproject.toml"
+with open(_pyproject, "rb") as _f:
+    APP_VERSION = tomllib.load(_f)["project"]["version"]
 
 # Logging setup
 logging.basicConfig(
@@ -81,7 +87,7 @@ async def lifespan(app: FastAPI):
     config = get_config()
 
     logger.info("=" * 60)
-    logger.info(f"  🌐 VoxDesk — Local AI Desktop Assistant v0.1.0")
+    logger.info(f"  🌐 VoxDesk — Local AI Desktop Assistant v{APP_VERSION}")
     logger.info(f"  📍 http://{config.host}:{config.port}")
     logger.info("=" * 60)
 
@@ -286,12 +292,7 @@ async def _safe_shutdown() -> None:
     # LLM
     try:
         if _state.llm:
-            if hasattr(_state.llm, 'unload'):
-                _state.llm.unload()
-            elif hasattr(_state.llm, 'aclose'):
-                await _state.llm.aclose()
-            elif hasattr(_state.llm, 'close'):
-                _state.llm.close()
+            _state.llm.unload()
     except Exception as e:
         logger.error(f"LLM shutdown hatası: {e}")
 
@@ -314,14 +315,15 @@ async def _safe_shutdown() -> None:
 app = FastAPI(
     title="VoxDesk",
     description="Local AI Desktop Assistant — Screen Analysis + Voice Chat",
-    version="0.1.0",
+    version=APP_VERSION,
     lifespan=lifespan,
 )
 
-# CORS — sadece localhost
+# CORS — sadece localhost, port config'ten
+_cors_port = get_config().port
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://127.0.0.1:8765", "http://localhost:8765"],
+    allow_origins=[f"http://127.0.0.1:{_cors_port}", f"http://localhost:{_cors_port}"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -503,7 +505,7 @@ async def debug_metrics():
         },
         "llm": {
             "provider": state.config.llm.provider,
-            "model_path": state.config.llm.model_path,
+            "model": state.llm.model_name if state.llm else None,
             "loaded": state.llm.is_loaded if state.llm else False,
         },
     }
