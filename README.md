@@ -212,8 +212,7 @@ VoxDesk/
 │       ├── settings.js         # Settings panel
 │       └── screen-preview.js   # Live screen preview
 ├── models/                     # GGUF model files (not in git)
-│   ├── minicpm-v4.5-official/  # Primary model
-│   └── minicpm-v4.5-abliterated/ # Abliterated variant
+│   └── minicpm-v4.5-official/  # Primary model
 ├── config/
 │   ├── default.yaml            # Application configuration
 │   └── personalities/          # AI personality profiles
