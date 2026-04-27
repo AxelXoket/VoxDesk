@@ -404,3 +404,31 @@ async def _handle_legacy_audio(
         "type": "llm_response",
         "text": llm_response,
     })
+
+    # TTS — streaming, executor'da çalışır
+    if state.tts and state.tts.enabled:
+        import soundfile as sf
+
+        try:
+            def _produce_tts_chunks():
+                chunks = []
+                for chunk in state.tts.synthesize_stream(llm_response):
+                    buf = io.BytesIO()
+                    sf.write(buf, chunk, state.tts.sample_rate, format="WAV")
+                    chunks.append(base64.b64encode(buf.getvalue()).decode())
+                return chunks
+
+            tts_chunks = await loop.run_in_executor(None, _produce_tts_chunks)
+            for chunk_b64 in tts_chunks:
+                await websocket.send_json({
+                    "type": "tts_audio",
+                    "audio": chunk_b64,
+                })
+        except Exception as tts_err:
+            logger.error(f"Voice legacy TTS error: {tts_err}")
+            await websocket.send_json({
+                "type": "voice_error",
+                "code": "TTS_FAILED",
+                "message": "Failed to synthesize speech.",
+                "recoverable": True,
+            })

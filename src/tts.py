@@ -1,4 +1,4 @@
-﻿"""
+"""
 VoxDesk — Text-to-Speech Module
 Kokoro TTS ile İngilizce ses sentezi.
 28+ ses profili, ses karıştırma, streaming chunk desteği.
@@ -63,20 +63,6 @@ class VoiceSynth:
             unload_cooldown_seconds=unload_cooldown_seconds,
             keep_warm=keep_warm,
         )
-
-    def _init_pipeline(self):
-        """Kokoro pipeline'ı başlat."""
-        if self._pipeline is not None:
-            return
-
-        try:
-            from kokoro import KPipeline
-
-            self._pipeline = KPipeline(lang_code=self.lang_code)
-            logger.info(f"✅ Kokoro TTS başlatıldı — ses: {self.voice}, lang: {self.lang_code}")
-        except Exception as e:
-            logger.error(f"❌ Kokoro TTS başlatılamadı: {e}")
-            raise
 
     def synthesize(self, text: str) -> bytes | None:
         """
