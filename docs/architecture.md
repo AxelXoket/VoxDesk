@@ -1,8 +1,9 @@
 # VoxDesk Architecture — Production Reference
 
-> **Version**: v0.1.0 — Phase 1–6 Complete  
+> **Version**: v0.2.0 — Sprint 4: Pure Local LlamaCppProvider  
 > **Runtime**: Python 3.12 + FastAPI + Uvicorn  
-> **Inference**: Local-only (Whisper, Kokoro TTS, Ollama LLM)  
+> **Inference**: Local-only (Whisper STT, Kokoro TTS, llama-cpp-python LLM)  
+> **GPU**: RTX 5080 (Blackwell, SM 12.0) — CUDA 12.8  
 > **Audio**: PCM binary WebSocket (v1) + legacy base64 fallback
 
 ---
@@ -19,7 +20,7 @@
 - **No CDN**: No external scripts, fonts, or stylesheets
 - **No runtime downloads**: Models must be pre-installed; missing = fail
 - **Localhost binding**: Server binds to `127.0.0.1` only
-- **WebSocket origins**: Only `localhost` and `127.0.0.1` accepted
+- **WebSocket origins**: Only `localhost` and `127.0.0.1` accepted, validated via `check_origin()` helper
 
 ### Config Enforcement
 
@@ -244,7 +245,9 @@ All flags are **restart-only** (no runtime toggle):
 | `enable_binary_audio` | `false` | Binary PCM transfer |
 | `enable_audioworklet` | `false` | AudioWorklet capture |
 | `enable_mediarecorder_fallback` | `true` | MediaRecorder fallback |
-| `enable_debug_metrics` | `false` | `/api/debug/metrics` |
+| `enable_debug_metrics` | `false` | `/api/debug/metrics` (returns 403 when disabled) |
+
+> **Note**: VRAM monitor only starts when `enable_vram_unload` is `true`. When `false`, `VRAMManager` is still created for reporting but the idle-unload background task does not run.
 
 ---
 
@@ -257,15 +260,54 @@ Minimal, safe to expose. **No** model names, paths, VRAM, or registry info.
 ```json
 {
   "status": "ok",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "uptime_seconds": 42.5,
   "degraded": false
 }
 ```
 
+### `/api/status` (Runtime State)
+
+Safe runtime snapshot with model states, capture status, connections, and feature flags. **No** filesystem paths or secrets.
+
+```json
+{
+  "api": {
+    "status": "ok",
+    "version": "0.2.0",
+    "uptime_seconds": 42.5,
+    "degraded": false
+  },
+  "capture": {
+    "running": true,
+    "latest_frame_age_ms": 80
+  },
+  "connections": {
+    "chat": { "count": 1, "state": "connected" },
+    "screen": { "count": 1, "state": "connected" },
+    "voice": { "count": 0, "state": "idle" },
+    "voice_v2": { "count": 0, "state": "idle" }
+  },
+  "models": {
+    "stt": { "name": "large-v3-turbo", "state": "LOADED" },
+    "llm": { "name": "MiniCPM-V-4.5-Q6_K", "state": "LOADED" },
+    "tts": { "name": "af_heart", "state": "UNLOADED" }
+  },
+  "features": {
+    "enable_module_registry": true,
+    "enable_vram_unload": false,
+    "enable_binary_audio": false,
+    "enable_audioworklet": false,
+    "enable_mediarecorder_fallback": true,
+    "enable_debug_metrics": false
+  },
+  "last_error": null
+}
+```
+
 ### `/api/debug/metrics` (Dev/Debug)
 
-Full process-local metrics. **Not for production exposure.**
+Full process-local metrics. **Gated by `enable_debug_metrics` feature flag** — returns HTTP 403 when disabled (default: disabled).
 
 Contains: registry catalog, engine config, VRAM model states, sliding-window percentiles.
 
@@ -303,7 +345,7 @@ python -m pytest tests/test_audio_protocol.py -v
 | Marker | Count | Purpose |
 |:---|:---:|:---|
 | `unit` | ~300 | Core logic |
-| `regression` | ~30 | Privacy, isolation, no-external-URL |
+| `regression` | ~60 | Privacy, isolation, config mapping, endpoint contracts, prompt safety |
 | `benchmark` | 4 | Performance baselines |
 | `gpu` | 1 | GPU smoke (skipped if no CUDA) |
 
@@ -312,6 +354,16 @@ python -m pytest tests/test_audio_protocol.py -v
 - **Target**: ≥55% (`--cov-fail-under=55`)
 - **Current**: ~65%
 - **Low coverage modules**: Route handlers (23–51%) — require real WebSocket/HTTP integration tests
+
+### WebSocket Origin Validation
+
+`ConnectionManager.connect()` accepts an `allowed_origins` parameter. The `check_origin()` helper supports:
+
+- Exact matches (e.g. `http://127.0.0.1:8765`)
+- Wildcard port patterns (e.g. `http://localhost:*`)
+- Missing Origin header is allowed for non-browser/test clients
+
+Rejection uses the accept-then-close pattern (Starlette requires `accept()` before `close()`).
 
 ---
 

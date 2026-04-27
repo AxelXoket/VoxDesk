@@ -26,15 +26,27 @@ class CaptureConfig(BaseModel):
 
 class LLMConfig(BaseModel):
     model_config = ConfigDict(extra='forbid')
-    provider: str = "ollama"
-    model: str = "huihui-ai/minicpm-v4.5-abliterated"
-    fallback_models: list[str] = Field(default_factory=lambda: [
-        "AliBilge/GLM-4.6V-Flash-abliterated",
-        "gemma4:e4b",
-    ])
+    provider: str = "llama-cpp"
+
+    # Local model paths — explicit, no auto-discovery, no runtime download
+    model_path: str | None = None
+    mmproj_path: str | None = None
+
+    # Local fallback model paths (Sprint 4 PoC: null, ileride lower quant)
+    fallback_model_path: str | None = None
+    fallback_mmproj_path: str | None = None
+
+    # llama-cpp-python specific
+    n_gpu_layers: int = -1        # -1 = full GPU offload
+    n_ctx: int = 8192             # context window
+    chat_format: str | None = None  # None = auto-detect from model
+
+    # Shared inference params
     temperature: float = 0.7
     max_tokens: int = 2048
     context_messages: int = 10
+    # Sprint 3: multi-frame vision — 3D-Resampler doğrulandıktan sonra artır
+    llm_frame_count: int = 1
 
 
 class TTSConfig(BaseModel):
@@ -208,6 +220,13 @@ def load_config() -> AppConfig:
             "hotkeys": raw.get("hotkeys", {}),
             "history": raw.get("history", {}),
             "personality_name": raw.get("personality", "voxly"),
+            # Sprint 1 — Gap 5: map missing nested config sections
+            "privacy": raw.get("privacy", {}),
+            "network": raw.get("network", {}),
+            "model_loading": raw.get("model_loading", {}),
+            "features": raw.get("features", {}),
+            "security": raw.get("security", {}),
+            "vram": raw.get("vram", {}),
         }
 
     config = AppConfig(**config_data)

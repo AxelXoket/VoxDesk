@@ -84,6 +84,14 @@ class VoxChat {
                 this.isStreaming = false;
                 this.currentStreamEl = null;
                 break;
+
+            case 'error':
+                // Sprint 2: Structured LLM error — stop streaming, show error
+                this.hideTyping();
+                this.isStreaming = false;
+                this.currentStreamEl = null;
+                this.addMessage('assistant', `⚠️ ${data.message || 'An error occurred'}`);
+                break;
         }
     }
 

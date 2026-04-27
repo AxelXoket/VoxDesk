@@ -1,4 +1,4 @@
-﻿"""
+"""
 VoxDesk — Metrics Collector
 Sliding-window percentile collector + monotonic counters + gauges.
 Lives on app.state.metrics — NOT a global singleton.
@@ -147,7 +147,7 @@ class MetricsCollector:
 
     def get_uptime_seconds(self) -> float:
         """Uptime since MetricsCollector creation."""
-        return round(time.monotonic() - self._start_time, 1)
+        return round(time.monotonic() - self._start_time, 2)
 
     def get_latency_report(self) -> dict:
         """All latency percentile summaries."""

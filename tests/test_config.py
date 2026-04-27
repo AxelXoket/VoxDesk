@@ -18,6 +18,12 @@ from src.config import (
     HotkeyConfig,
     HistoryConfig,
     PersonalityConfig,
+    PrivacyConfig,
+    NetworkConfig,
+    ModelLoadingConfig,
+    FeaturesConfig,
+    SecurityConfig,
+    VRAMConfig,
     load_personality,
     load_config,
 )
@@ -44,11 +50,14 @@ class TestConfigDefaults:
 
     def test_llm_defaults(self):
         cfg = LLMConfig()
-        assert "minicpm" in cfg.model.lower()
+        assert cfg.provider == "llama-cpp"
+        assert cfg.model_path is None
+        assert cfg.mmproj_path is None
+        assert cfg.n_gpu_layers == -1
+        assert cfg.n_ctx == 8192
         assert cfg.temperature == 0.7
         assert cfg.max_tokens == 2048
         assert cfg.context_messages == 10
-        assert len(cfg.fallback_models) >= 1
 
     def test_tts_defaults(self):
         cfg = TTSConfig()
@@ -128,7 +137,7 @@ class TestAppConfigNesting:
         cfg = AppConfig(capture=CaptureConfig(interval_seconds=0.5))
         assert cfg.capture.interval_seconds == 0.5
         # Diğer alt-config'ler default kalmalı
-        assert cfg.llm.model == LLMConfig().model
+        assert cfg.llm.provider == LLMConfig().provider
 
     def test_personality_name_default(self):
         cfg = AppConfig()
@@ -237,3 +246,107 @@ class TestConfigLoading:
         # Reload sonrası get_config yeni instance'ı döndürmeli
         c3 = get_config()
         assert c3 is c2
+
+
+# ── Sprint 1 — Config Mapping Tests ──────────────────────────
+
+class TestConfigMappingSprint1:
+    """Sprint 1 Gap 5: load_config() maps all 6 previously-missing sections."""
+
+    def _make_yaml_and_load(self, tmp_path, yaml_content: dict):
+        """Helper: write yaml, point load_config at it, return AppConfig."""
+        import src.config as cfg_module
+
+        config_file = tmp_path / "default.yaml"
+        config_file.write_text(yaml.dump(yaml_content), encoding="utf-8")
+
+        personalities_dir = tmp_path / "personalities"
+        personalities_dir.mkdir(exist_ok=True)
+        (personalities_dir / "voxly.yaml").write_text(
+            yaml.dump({"name": "Voxly", "greeting": "Hi"}),
+            encoding="utf-8",
+        )
+
+        orig_default = cfg_module.DEFAULT_CONFIG
+        orig_personalities = cfg_module.PERSONALITIES_DIR
+        orig_config = cfg_module._config
+        try:
+            cfg_module.DEFAULT_CONFIG = config_file
+            cfg_module.PERSONALITIES_DIR = personalities_dir
+            cfg_module._config = None
+            return load_config()
+        finally:
+            cfg_module.DEFAULT_CONFIG = orig_default
+            cfg_module.PERSONALITIES_DIR = orig_personalities
+            cfg_module._config = orig_config
+
+    @pytest.mark.regression
+    def test_maps_features_section(self, tmp_path):
+        cfg = self._make_yaml_and_load(tmp_path, {
+            "features": {"enable_debug_metrics": True, "enable_vram_unload": True},
+        })
+        assert cfg.features.enable_debug_metrics is True
+        assert cfg.features.enable_vram_unload is True
+        # Unmapped fields keep defaults
+        assert cfg.features.enable_module_registry is True
+
+    @pytest.mark.regression
+    def test_maps_network_section(self, tmp_path):
+        cfg = self._make_yaml_and_load(tmp_path, {
+            "network": {"bind_host": "0.0.0.0"},
+        })
+        assert cfg.network.bind_host == "0.0.0.0"
+        assert len(cfg.network.allowed_ws_origins) >= 1
+
+    @pytest.mark.regression
+    def test_maps_privacy_section(self, tmp_path):
+        cfg = self._make_yaml_and_load(tmp_path, {
+            "privacy": {"offline_mode": False},
+        })
+        assert cfg.privacy.offline_mode is False
+        assert cfg.privacy.allow_cloud_providers is False  # default
+
+    @pytest.mark.regression
+    def test_maps_model_loading_section(self, tmp_path):
+        cfg = self._make_yaml_and_load(tmp_path, {
+            "model_loading": {"local_files_only": False},
+        })
+        assert cfg.model_loading.local_files_only is False
+        assert cfg.model_loading.fail_if_model_missing is True  # default
+
+    @pytest.mark.regression
+    def test_maps_security_section(self, tmp_path):
+        cfg = self._make_yaml_and_load(tmp_path, {
+            "security": {"max_ws_frame_bytes": 32768},
+        })
+        assert cfg.security.max_ws_frame_bytes == 32768
+        assert cfg.security.idle_disconnect_seconds == 300  # default
+
+    @pytest.mark.regression
+    def test_maps_vram_section(self, tmp_path):
+        cfg = self._make_yaml_and_load(tmp_path, {
+            "vram": {"monitor_interval_seconds": 10.0, "keep_warm": True},
+        })
+        assert cfg.vram.monitor_interval_seconds == 10.0
+        assert cfg.vram.keep_warm is True
+        assert cfg.vram.stt_idle_unload_seconds == 120.0  # default
+
+    @pytest.mark.regression
+    def test_missing_sections_use_defaults(self, tmp_path):
+        """YAML with no new sections → Pydantic defaults."""
+        cfg = self._make_yaml_and_load(tmp_path, {})
+        assert cfg.features.enable_debug_metrics is False
+        assert cfg.network.bind_host == "127.0.0.1"
+        assert cfg.privacy.offline_mode is True
+        assert cfg.model_loading.local_files_only is True
+        assert cfg.security.max_ws_frame_bytes == 65536
+        assert cfg.vram.monitor_interval_seconds == 30.0
+
+    @pytest.mark.regression
+    def test_unknown_keys_rejected_by_extra_forbid(self, tmp_path):
+        """extra='forbid' must reject unknown keys."""
+        from pydantic import ValidationError
+        with pytest.raises(ValidationError):
+            self._make_yaml_and_load(tmp_path, {
+                "features": {"nonexistent_flag": True},
+            })

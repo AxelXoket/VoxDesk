@@ -1,4 +1,4 @@
-﻿/**
+/**
  * VoxDesk — Audio Capture Client
  * AudioWorklet + binary WebSocket transfer.
  * MediaRecorder fallback AudioWorklet desteklenmediyse.
@@ -60,13 +60,36 @@ const CHUNK_MS = 20;
 
 class AudioCapture {
     /**
-     * @param {WebSocket} ws - WebSocket bağlantısı
+     * Sprint 3.5: Transport adapter pattern.
+     * @param {Object} transport - Transport adapter OR raw WebSocket (deprecated)
+     * @param {Function} transport.sendControl - JSON gönder
+     * @param {Function} transport.sendBinary - ArrayBuffer gönder
+     * @param {Function} transport.isOpen - Bağlantı açık mı
      * @param {Object} options
      * @param {boolean} options.useBinary - Binary transfer kullan (default: true)
      * @param {number} options.maxRecordMs - Maksimum kayıt süresi (ms)
      */
-    constructor(ws, options = {}) {
-        this.ws = ws;
+    constructor(transport, options = {}) {
+        // Sprint 3.5: Backwards compat — raw WebSocket geçilirse adapter'a sar
+        // NOT: Bu sadece güvenlik ağıdır. Normal akış transport adapter kullanmalı.
+        if (typeof WebSocket !== 'undefined' && transport instanceof WebSocket) {
+            console.warn('[AudioCapture] Raw WebSocket deprecated, use transport adapter');
+            const ws = transport;
+            this._transport = {
+                sendControl: (payload) => {
+                    if (ws.readyState === WebSocket.OPEN)
+                        ws.send(JSON.stringify(payload));
+                },
+                sendBinary: (buffer) => {
+                    if (ws.readyState === WebSocket.OPEN)
+                        ws.send(buffer);
+                },
+                isOpen: () => ws.readyState === WebSocket.OPEN,
+            };
+        } else {
+            this._transport = transport;
+        }
+
         this.useBinary = options.useBinary !== false;
         this.maxRecordMs = options.maxRecordMs || 30000; // 30s max
 
@@ -75,10 +98,16 @@ class AudioCapture {
         this._workletNode = null;
         this._mediaRecorder = null;
         this._handshakeAcked = false;
+        this._handshakeSent = false;
         this._recording = false;
         this._mode = null; // 'worklet' | 'mediarecorder'
         this._startTime = null;
         this._chunkCount = 0;
+        this._pendingChunks = []; // Buffer until ACK
+        // Sprint 3.5: ACK bound/timeout
+        this._maxPendingChunks = 10;
+        this._ackTimeoutMs = 3000;
+        this._ackTimer = null;
     }
 
     /**
@@ -122,35 +151,51 @@ class AudioCapture {
 
     /**
      * Audio capture durdur.
+     * Sprint 3.5: Mode-aware stop — MediaRecorder fallback için audio_end göndermez.
      */
     stop() {
         this._recording = false;
 
-        if (this._workletNode) {
-            this._workletNode.port.postMessage({ type: 'stop' });
-            this._workletNode.disconnect();
-            this._workletNode = null;
+        // Sprint 3.5: ACK timer temizliği
+        if (this._ackTimer) {
+            clearTimeout(this._ackTimer);
+            this._ackTimer = null;
         }
 
-        if (this._audioContext) {
-            this._audioContext.close().catch(() => {});
-            this._audioContext = null;
+        if (this._mode === 'worklet') {
+            // Worklet cleanup
+            if (this._workletNode) {
+                this._workletNode.port.postMessage({ type: 'stop' });
+                this._workletNode.disconnect();
+                this._workletNode = null;
+            }
+            if (this._audioContext) {
+                this._audioContext.close().catch(() => {});
+                this._audioContext = null;
+            }
+            // Worklet mode: audio_end gönder
+            if (this._transport.isOpen()) {
+                this._transport.sendControl({ type: 'audio_end' });
+            }
+        } else if (this._mode === 'mediarecorder') {
+            // Sprint 3.5: MediaRecorder mode — audio_end göndermiyoruz
+            // onstop callback legacy audio JSON gönderir, audio_end beklenmez
+            if (this._mediaRecorder && this._mediaRecorder.state !== 'inactive') {
+                this._mediaRecorder.stop();
+                this._mediaRecorder = null;
+            }
         }
 
-        if (this._mediaRecorder && this._mediaRecorder.state !== 'inactive') {
-            this._mediaRecorder.stop();
-            this._mediaRecorder = null;
-        }
-
+        // Mic stream cleanup (her iki mod için)
         if (this._stream) {
             this._stream.getTracks().forEach(track => track.stop());
             this._stream = null;
         }
 
-        // audio_end gönder
-        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-            this.ws.send(JSON.stringify({ type: 'audio_end' }));
-        }
+        // Sprint 2: Reset handshake state for clean next session
+        this._handshakeAcked = false;
+        this._handshakeSent = false;
+        this._pendingChunks = [];
 
         console.log(`[AudioCapture] Durduruldu — ${this._chunkCount} chunks, mode: ${this._mode}`);
     }
@@ -197,14 +242,25 @@ class AudioCapture {
                 ? resample(pcmBuffer, actualRate, TARGET_SAMPLE_RATE)
                 : pcmBuffer;
 
-            // Handshake yapılmamışsa gönder
-            if (!this._handshakeAcked) {
+            // Handshake gönderilmemişse gönder
+            if (!this._handshakeSent) {
                 this._sendHandshake();
             }
 
-            // Binary gönder
-            if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-                this.ws.send(finalPcm.buffer);
+            // ACK bekle — buffer'a ekle
+            if (!this._handshakeAcked) {
+                // Sprint 3.5: Bounded pending buffer
+                if (this._pendingChunks.length >= this._maxPendingChunks) {
+                    console.warn('[AudioCapture] Max pending chunks — dropping oldest');
+                    this._pendingChunks.shift();
+                }
+                this._pendingChunks.push(finalPcm.buffer);
+                return;
+            }
+
+            // Binary gönder — Sprint 3.5: transport adapter
+            if (this._transport.isOpen()) {
+                this._transport.sendBinary(finalPcm.buffer);
                 this._chunkCount++;
             }
         };
@@ -225,20 +281,60 @@ class AudioCapture {
     }
 
     _sendHandshake() {
-        if (this._handshakeAcked) return;
-        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+        if (this._handshakeSent) return;
+        if (!this._transport.isOpen()) return;
 
-        this.ws.send(JSON.stringify({
+        this._transport.sendControl({
             type: 'audio_config',
             protocol_version: PROTOCOL_VERSION,
             encoding: 'pcm_s16le',
             sample_rate: TARGET_SAMPLE_RATE,
             channels: 1,
             chunk_ms: CHUNK_MS,
-        }));
+        });
 
-        // ACK dinle (ws.onmessage handler dışarıdan set edilmiş olmalı)
-        this._handshakeAcked = true; // Optimistic — server reject ederse error gelir
+        this._handshakeSent = true;
+        // ACK will be received via handleMessage() — do NOT set _handshakeAcked here
+
+        // Sprint 3.5: ACK timeout
+        this._ackTimer = setTimeout(() => {
+            if (!this._handshakeAcked && this._recording) {
+                console.error('[AudioCapture] ACK timeout — stopping');
+                this.stop();
+            }
+        }, this._ackTimeoutMs);
+    }
+
+    /**
+     * Sprint 2: Process server messages for ACK/error handling.
+     * Call this from app.js voice:message event handler.
+     * @param {Object} data - Parsed JSON message from server
+     */
+    handleMessage(data) {
+        if (data.type === 'audio_config_ack') {
+            this._handshakeAcked = true;
+            // Sprint 3.5: Clear ACK timeout
+            if (this._ackTimer) {
+                clearTimeout(this._ackTimer);
+                this._ackTimer = null;
+            }
+            console.log('[AudioCapture] Handshake ACK received');
+
+            // Flush pending chunks — Sprint 3.5: transport adapter
+            if (this._transport.isOpen()) {
+                for (const buf of this._pendingChunks) {
+                    this._transport.sendBinary(buf);
+                    this._chunkCount++;
+                }
+            }
+            this._pendingChunks = [];
+        } else if (data.type === 'protocol_error') {
+            console.error('[AudioCapture] Protocol error:', data.message || data.code);
+            // Reset handshake state on protocol error
+            this._handshakeAcked = false;
+            this._handshakeSent = false;
+            this._pendingChunks = [];
+        }
     }
 
     // ── MediaRecorder Fallback ──────────────────────────────
@@ -271,13 +367,13 @@ class AudioCapture {
                 )
             );
 
-            // Legacy base64 path
-            if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-                this.ws.send(JSON.stringify({
+            // Legacy base64 path — Sprint 3.5: transport adapter
+            if (this._transport.isOpen()) {
+                this._transport.sendControl({
                     type: 'audio',
                     audio: base64,
                     format: 'webm',
-                }));
+                });
             }
         };
 

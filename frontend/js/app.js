@@ -32,56 +32,62 @@ document.addEventListener('DOMContentLoaded', () => {
             : 'var(--glass-bg)';
 
         if (voiceModeActive) {
+            // Sprint 3.5: Feature flag check before connecting voice
+            const features = _cachedFeatures;
+            if (features && !features.enable_binary_audio && !features.enable_mediarecorder_fallback) {
+                console.warn('[App] Voice disabled by config');
+                window.VoxChat.addMessage('assistant', '⚠️ Voice is currently disabled in configuration.');
+                voiceModeActive = false;
+                voiceIndicator.style.display = 'none';
+                voiceModeBtn.style.background = 'var(--glass-bg)';
+                return;
+            }
             window.voxWs.connectVoice();
         }
     });
 
-    // Mic button — Push-to-talk
+    // Mic button — Push-to-talk via AudioCapture
     const micBtn = document.getElementById('btnMic');
-    let isRecording = false;
-    let mediaRecorder = null;
-    let audioChunks = [];
+    let audioCapture = null;
 
     micBtn.addEventListener('mousedown', async () => {
-        if (isRecording) return;
-        isRecording = true;
+        if (audioCapture && audioCapture.isRecording) return;
+
+        // Ensure voice WS is connected
+        if (!window.voxWs.isVoiceConnected()) {
+            window.voxWs.connectVoice();
+            // Wait briefly for connection
+            await new Promise(r => setTimeout(r, 500));
+            if (!window.voxWs.isVoiceConnected()) {
+                console.error('[App] Voice WS not connected');
+                return;
+            }
+        }
+
         micBtn.classList.add('recording');
-        audioChunks = [];
 
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
-
-            mediaRecorder.ondataavailable = (e) => {
-                if (e.data.size > 0) audioChunks.push(e.data);
+            // Sprint 3.5: Transport adapter instead of raw WebSocket
+            const transport = {
+                sendControl: (payload) => window.voxWs.sendVoiceControl(payload),
+                sendBinary: (buffer) => window.voxWs.sendVoiceBinary(buffer),
+                isOpen: () => window.voxWs.isVoiceConnected(),
             };
-
-            mediaRecorder.onstop = async () => {
-                const blob = new Blob(audioChunks, { type: 'audio/webm' });
-                const arrayBuf = await blob.arrayBuffer();
-                // btoa large blob'larda çöker — chunk'lı encode
-                const base64 = arrayBufferToBase64(arrayBuf);
-
-                // WS voice endpoint'e format bilgisi ile gönder
-                window.voxWs.sendVoiceAudio(base64, 'webm');
-
-                // Stream'i kapat
-                stream.getTracks().forEach(t => t.stop());
-            };
-
-            mediaRecorder.start();
+            // Sprint 3.5: Pass feature flags to AudioCapture
+            const useBinary = _cachedFeatures?.enable_binary_audio !== false;
+            audioCapture = new AudioCapture(transport, { useBinary });
+            await audioCapture.start();
         } catch (e) {
             console.error('Mikrofon hatası:', e);
-            isRecording = false;
             micBtn.classList.remove('recording');
+            audioCapture = null;
         }
     });
 
     micBtn.addEventListener('mouseup', () => {
-        if (mediaRecorder && mediaRecorder.state === 'recording') {
-            mediaRecorder.stop();
+        if (audioCapture && audioCapture.isRecording) {
+            audioCapture.stop();
         }
-        isRecording = false;
         micBtn.classList.remove('recording');
     });
 
@@ -97,6 +103,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     window.voxWs.on('voice:message', (data) => {
+        // Sprint 2: Route ACK/error to AudioCapture
+        if (audioCapture) {
+            audioCapture.handleMessage(data);
+        }
+
         if (data.type === 'stt_result') {
             window.VoxChat.addMessage('user', `🎤 ${data.text}`);
         } else if (data.type === 'llm_response') {
@@ -104,8 +115,26 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (data.type === 'tts_audio') {
             ttsQueue.push(data.audio);
             if (!ttsPlaying) playNextTTS();
+        } else if (data.type === 'voice_error') {
+            // Sprint 2: Show voice errors as assistant messages
+            window.VoxChat.addMessage('assistant', `⚠️ ${data.message || 'Voice error occurred'}`);
         }
     });
+
+    // Sprint 3.5: Voice close/error cleanup — stop AudioCapture safely
+    function _cleanupVoiceCapture(reason) {
+        console.log(`[App] Voice cleanup: ${reason}`);
+        if (audioCapture && audioCapture.isRecording) {
+            audioCapture.stop();
+        }
+        audioCapture = null;
+        micBtn.classList.remove('recording');
+        ttsQueue.length = 0;
+        ttsPlaying = false;
+    }
+
+    window.voxWs.on('voice:disconnected', () => _cleanupVoiceCapture('disconnected'));
+    window.voxWs.on('voice:error', (err) => _cleanupVoiceCapture(`error: ${err}`));
 
     // Settings panel toggle
     const settingsBtn = document.getElementById('btnSettings');
@@ -118,20 +147,45 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('✅ VoxDesk UI hazır!');
 });
 
+// Sprint 3.5: Feature flags cache from /api/status
+let _cachedFeatures = null;
+
 async function checkHealth() {
+    const statusEl = document.getElementById('statusText');
+    const dotEl = document.getElementById('captureDot');
+
     try {
-        const res = await fetch('/api/health');
-        const data = await res.json();
+        const healthRes = await fetch('/api/health');
+        const health = await healthRes.json();
 
-        const statusEl = document.getElementById('statusText');
-        const dotEl = document.getElementById('captureDot');
+        if (health.status !== 'ok') {
+            statusEl.textContent = 'Backend degraded';
+            dotEl.classList.remove('active');
+            return;
+        }
 
-        if (data.status === 'ok') {
-            statusEl.textContent = `Aktif — ${data.model.split('/').pop()}`;
-            if (data.capture_running) dotEl.classList.add('active');
+        try {
+            const statusRes = await fetch('/api/status');
+            const status = await statusRes.json();
+
+            const modelName = status?.models?.llm?.name || 'runtime ready';
+            statusEl.textContent = `Aktif — ${String(modelName).split('/').pop()}`;
+
+            // Sprint 3.5: Cache feature flags for voice mode decisions
+            _cachedFeatures = status?.features || null;
+
+            if (status?.capture?.running) {
+                dotEl.classList.add('active');
+            } else {
+                dotEl.classList.remove('active');
+            }
+        } catch (statusError) {
+            statusEl.textContent = 'Backend active — runtime status unavailable';
+            dotEl.classList.remove('active');
         }
     } catch (e) {
-        document.getElementById('statusText').textContent = 'Bağlantı bekleniyor...';
+        statusEl.textContent = 'Bağlantı bekleniyor...';
+        dotEl.classList.remove('active');
     }
 }
 

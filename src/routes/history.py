@@ -22,6 +22,8 @@ async def get_history():
     """Konuşma geçmişini döndür."""
     from src.main import get_app_state
     state = get_app_state()
+    if state.llm is None:
+        return []
     return state.llm.export_history()
 
 
@@ -30,6 +32,8 @@ async def clear_history():
     """Konuşma geçmişini temizle."""
     from src.main import get_app_state
     state = get_app_state()
+    if state.llm is None:
+        return {"status": "error", "message": "LLM unavailable"}
     state.llm.clear_history()
     return {"status": "ok", "message": "Geçmiş temizlendi"}
 
@@ -43,7 +47,7 @@ async def export_history():
     state = get_app_state()
     config = get_config()
 
-    history = state.llm.export_history()
+    history = state.llm.export_history() if state.llm else []
     if not history:
         return {"status": "empty", "message": "Kaydedilecek geçmiş yok"}
 

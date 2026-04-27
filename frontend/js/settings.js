@@ -88,14 +88,15 @@ class VoxSettings {
     async loadModels() {
         try {
             const res = await fetch('/api/models');
-            const models = await res.json();
+            const data = await res.json();
+            const models = data.models || [];
 
             if (models.length > 0) {
                 this.modelSelect.innerHTML = '';
                 models.forEach(m => {
                     const opt = document.createElement('option');
                     opt.value = m.name;
-                    opt.textContent = m.name;
+                    opt.textContent = m.name + (m.role ? ` (${m.role})` : '');
                     this.modelSelect.appendChild(opt);
                 });
             }

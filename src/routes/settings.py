@@ -1,4 +1,4 @@
-﻿"""
+"""
 VoxDesk — Settings API Routes
 Yapılandırma, model, kişilik, ses profili yönetimi.
 """
@@ -18,7 +18,7 @@ router = APIRouter(prefix="/api", tags=["settings"])
 
 
 class SettingsResponse(BaseModel):
-    model: str
+    model: str | None
     voice: str
     tts_speed: float
     tts_enabled: bool
@@ -44,7 +44,7 @@ async def get_settings():
     """Mevcut ayarları döndür."""
     config = get_config()
     return SettingsResponse(
-        model=config.llm.model,
+        model=config.llm.model_path,
         voice=config.tts.voice,
         tts_speed=config.tts.speed,
         tts_enabled=config.tts.enabled,
@@ -83,10 +83,16 @@ async def update_voice(request: VoiceUpdateRequest):
 
 @router.get("/models")
 async def list_models():
-    """Ollama'da yüklü modelleri listele (lokal)."""
+    """Yüklü modelleri listele (lokal dosya)."""
     from src.main import get_app_state
     state = get_app_state()
-    return await state.llm.list_models()
+    config = get_config()
+    models = []
+    if config.llm.model_path:
+        models.append({"name": config.llm.model_path, "role": "primary"})
+    if config.llm.fallback_model_path:
+        models.append({"name": config.llm.fallback_model_path, "role": "fallback"})
+    return {"models": models, "llm_available": state.llm is not None}
 
 
 @router.put("/model")
@@ -94,6 +100,8 @@ async def update_model(request: ModelUpdateRequest):
     """Aktif modeli değiştir."""
     from src.main import get_app_state
     state = get_app_state()
+    if state.llm is None:
+        return {"status": "error", "message": "LLM unavailable — model file missing"}
     state.llm.set_model(request.model)
     return {"status": "ok", "model": request.model}
 
@@ -125,7 +133,8 @@ async def set_personality(name: str):
 
     try:
         personality = load_personality(name)
-        state.llm.set_personality(personality)
+        if state.llm is not None:
+            state.llm.set_personality(personality)
         if state.tts and personality.voice:
             state.tts.set_voice(personality.voice)
         return {"status": "ok", "personality": personality.name}
