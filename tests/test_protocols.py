@@ -1,4 +1,4 @@
-﻿"""
+"""
 VoxDesk — Protocol Compliance Tests
 Mevcut engine class'larının Protocol contract'larına uyduğunu doğrular.
 runtime_checkable + structural typing ile isinstance check.
@@ -181,11 +181,11 @@ class TestCaptureProtocol:
 # ══════════════════════════════════════════════════════════════
 
 class TestLLMProtocol:
-    """VisionLLM LLMProvider protocol'üne uymalı."""
+    """LlamaCppProvider LLMProvider protocol'üne uymalı."""
 
     @pytest.mark.unit
     def test_llm_has_required_methods(self, make_llm):
-        """VisionLLM gerekli tüm method'lara sahip olmalı."""
+        """LlamaCppProvider gerekli tüm method'lara sahip olmalı."""
         llm = make_llm()
 
         required_methods = [
@@ -201,9 +201,9 @@ class TestLLMProtocol:
 
     @pytest.mark.unit
     def test_llm_aclose_method_needed(self, make_llm):
-        """VisionLLM henüz aclose() method'u yok."""
+        """LlamaCppProvider henüz aclose() method'u yok."""
         llm = make_llm()
         has_aclose = hasattr(llm, "aclose")
         has_health = hasattr(llm, "health")
         if not has_aclose:
-            pytest.skip("VisionLLM.aclose() henüz yok — Phase 3'te eklenecek")
+            pytest.skip("LlamaCppProvider.aclose() henüz yok — Phase 3'te eklenecek")

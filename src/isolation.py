@@ -1,4 +1,4 @@
-﻿"""
+"""
 VoxDesk — Çalışma Zamanı İzolasyonu
 İndirme bittikten sonra tüm dış bağlantıları kapatır.
 Kullanım sırasında hiçbir veri bilgisayar dışına çıkmaz.
@@ -16,10 +16,6 @@ logger = logging.getLogger("voxdesk.isolation")
 def _set_env_guards() -> None:
     """Tüm bileşenlerin dış bağlantı yapmasını engelleyen env variable'ları set et."""
     guards = {
-        # Ollama — cloud özelliklerini kapat
-        "OLLAMA_NO_CLOUD": "1",
-        # Ollama — güncelleme kontrolünü kapat
-        "OLLAMA_NO_UPDATE_CHECK": "1",
         # HuggingFace Hub — model indirme/kontrol tamamen kapalı
         "HF_HUB_OFFLINE": "1",
         # Transformers — offline mode
@@ -79,8 +75,6 @@ def verify_isolation() -> dict:
         logger.info("🔒 Tam izolasyon aktif — İnternet erişimi yok, veriler güvende")
 
     # 3. Bileşen durumlarını logla
-    logger.info(f"   OLLAMA_NO_CLOUD={os.environ.get('OLLAMA_NO_CLOUD')}")
-    logger.info(f"   OLLAMA_NO_UPDATE_CHECK={os.environ.get('OLLAMA_NO_UPDATE_CHECK')}")
     logger.info(f"   HF_HUB_OFFLINE={os.environ.get('HF_HUB_OFFLINE')}")
     logger.info(f"   TRANSFORMERS_OFFLINE={os.environ.get('TRANSFORMERS_OFFLINE')}")
     logger.info(f"   FastAPI bind: 127.0.0.1 only")

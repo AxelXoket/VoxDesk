@@ -7,6 +7,7 @@ Binds to 127.0.0.1 only — no external network access.
 from __future__ import annotations
 
 import logging
+import time
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -21,7 +22,7 @@ from src.registry import ModuleRegistry
 from src.vram_manager import VRAMManager
 from src.isolation import verify_isolation
 from src.capture import ScreenCapture
-from src.llm_client import VisionLLM
+from src.llm import LlamaCppProvider
 from src.stt import SpeechRecognizer
 from src.tts import VoiceSynth
 from src.websocket_manager import ConnectionManager
@@ -45,12 +46,20 @@ class AppState:
     registry: ModuleRegistry = field(default_factory=ModuleRegistry)
     vram_manager: VRAMManager | None = None
     capture: ScreenCapture | None = None
-    llm: VisionLLM | None = None
+    llm: LlamaCppProvider | None = None
     stt: SpeechRecognizer | None = None
     tts: VoiceSynth | None = None
     ws_manager: ConnectionManager = field(default_factory=ConnectionManager)
     hotkey_manager: HotkeyManager | None = None
     tray: TrayIcon | None = None
+    # Sprint 3: last error tracking for DEV HUD
+    _last_error: str | None = None
+    _last_error_time: float | None = None
+
+    def record_error(self, error: str) -> None:
+        """Son hatayı kaydet — DEV HUD ve /api/status için."""
+        self._last_error = error
+        self._last_error_time = time.time()
 
 
 # Global state
@@ -95,11 +104,19 @@ async def lifespan(app: FastAPI):
         )
         _state.capture.start()
 
-        # LLM — registry üzerinden
-        _state.llm = _state.registry.create(
-            "llm", config.llm.provider, config.llm
-        )
-        logger.info(f"  🤖 Model: {config.llm.model}")
+        # LLM — degraded mode if model missing
+        try:
+            _state.llm = _state.registry.create(
+                "llm", config.llm.provider, config.llm
+            )
+            _state.llm.set_metrics(_state.metrics)  # Sprint 3: metrics injection
+            logger.info(f"  🤖 Model: {config.llm.model_path or 'not configured'}")
+        except FileNotFoundError as e:
+            logger.warning(f"  ⚠️ LLM unavailable (degraded mode): {e}")
+            _state.llm = None
+        except Exception as e:
+            logger.error(f"  ❌ LLM load error (degraded mode): {e}")
+            _state.llm = None
 
         # STT — registry üzerinden
         _state.stt = _state.registry.create(
@@ -113,6 +130,12 @@ async def lifespan(app: FastAPI):
         )
         logger.info(f"  🔊 TTS: {config.tts.voice}")
 
+        # Sprint 3: ws_manager metrics injection (dataclass default'ta yaratıldığı için burada)
+        _state.ws_manager.set_metrics(_state.metrics)
+
+        # Sprint 3.5: ws_manager Origin allowlist injection
+        _state.ws_manager.set_allowed_origins(config.network.allowed_ws_origins)
+
         # 5. VRAM Manager — model lifecycle koordinasyonu
         _state.vram_manager = VRAMManager(
             metrics=_state.metrics,
@@ -123,8 +146,13 @@ async def lifespan(app: FastAPI):
             _state.vram_manager.register_model("stt", _state.stt._lifecycle)
         if _state.tts:
             _state.vram_manager.register_model("tts", _state.tts._lifecycle)
-        await _state.vram_manager.start_monitor()
-        logger.info(f"  📊 VRAM monitor başlatıldı")
+
+        # Sprint 1 Task 8: only start idle-unload monitor when feature flag is on
+        if config.features.enable_vram_unload:
+            await _state.vram_manager.start_monitor()
+            logger.info("  📊 VRAM monitor başlatıldı")
+        else:
+            logger.info("  📊 VRAM idle unload disabled by feature flag")
 
         # Hotkeys — doğrudan (registry dışı, UI component)
         _state.hotkey_manager = HotkeyManager(
@@ -178,12 +206,12 @@ def _register_default_factories(registry: ModuleRegistry) -> None:
         description="dxcam screen capture",
     )
 
-    # LLM
+    # LLM — llama-cpp-python local GGUF provider
     registry.register(
-        "llm", "ollama",
-        lambda cfg: VisionLLM(),
-        requires_gpu=False,
-        description="Ollama local LLM",
+        "llm", "llama-cpp",
+        lambda cfg: LlamaCppProvider(cfg),
+        requires_gpu=True,
+        description="llama-cpp-python local GGUF inference",
     )
 
     # STT
@@ -257,10 +285,13 @@ async def _safe_shutdown() -> None:
 
     # LLM
     try:
-        if _state.llm and hasattr(_state.llm, 'aclose'):
-            await _state.llm.aclose()
-        elif _state.llm and hasattr(_state.llm, 'close'):
-            _state.llm.close()
+        if _state.llm:
+            if hasattr(_state.llm, 'unload'):
+                _state.llm.unload()
+            elif hasattr(_state.llm, 'aclose'):
+                await _state.llm.aclose()
+            elif hasattr(_state.llm, 'close'):
+                _state.llm.close()
     except Exception as e:
         logger.error(f"LLM shutdown hatası: {e}")
 
@@ -334,12 +365,104 @@ async def health():
     if state.capture and not state.capture.is_running:
         degraded = True
         status = "degraded"
+    if state.llm is None:
+        degraded = True
+        status = "degraded"
 
     return {
         "status": status,
         "version": app.version,
         "uptime_seconds": state.metrics.get_uptime_seconds(),
         "degraded": degraded,
+    }
+
+
+@app.get("/api/status")
+async def runtime_status():
+    """Runtime status — safe model/capture/connections/features snapshot."""
+    import time
+
+    state = get_app_state()
+    config = state.config
+
+    # API section — mirrors health but nested
+    degraded = False
+    api_status = "ok"
+    if state.capture and not state.capture.is_running:
+        degraded = True
+        api_status = "degraded"
+    if state.llm is None:
+        degraded = True
+        api_status = "degraded"
+
+    # Capture section
+    capture_info: dict = {"running": False, "latest_frame_age_ms": None}
+    if state.capture:
+        capture_info["running"] = state.capture.is_running
+        try:
+            frame = state.capture.get_latest_frame()
+            if frame:
+                capture_info["latest_frame_age_ms"] = max(
+                    0, int((time.time() - frame.timestamp) * 1000)
+                )
+        except Exception:
+            pass
+
+    # Connections section
+    channels = ["chat", "screen", "voice", "voice_v2"]
+    connections = {}
+    for ch in channels:
+        count = state.ws_manager.get_connection_count(ch)
+        connections[ch] = {
+            "count": count,
+            "state": "connected" if count > 0 else "idle",
+        }
+
+    # Models section — safe name + state, no paths
+    def _model_info(subsystem, name_attr: str) -> dict:
+        if subsystem is None:
+            return {"name": None, "state": "UNAVAILABLE"}
+        name = getattr(subsystem, name_attr, None)
+        loaded = False
+        if hasattr(subsystem, "is_loaded"):
+            loaded = subsystem.is_loaded
+        elif hasattr(subsystem, "_lifecycle"):
+            loaded = getattr(subsystem._lifecycle, "is_loaded", False)
+        elif hasattr(subsystem, "_model"):
+            loaded = subsystem._model is not None
+        elif hasattr(subsystem, "_pipeline"):
+            loaded = subsystem._pipeline is not None
+        return {"name": name, "state": "LOADED" if loaded else "UNLOADED"}
+
+    models = {
+        "stt": _model_info(state.stt, "model_name"),
+        "llm": _model_info(state.llm, "model_name"),
+        "tts": _model_info(state.tts, "voice"),
+    }
+
+    # Features — booleans only from config
+    features = {
+        "enable_module_registry": config.features.enable_module_registry,
+        "enable_vram_unload": config.features.enable_vram_unload,
+        "enable_binary_audio": config.features.enable_binary_audio,
+        "enable_audioworklet": config.features.enable_audioworklet,
+        "enable_mediarecorder_fallback": config.features.enable_mediarecorder_fallback,
+        "enable_debug_metrics": config.features.enable_debug_metrics,
+    }
+
+    return {
+        "api": {
+            "status": api_status,
+            "version": app.version,
+            "uptime_seconds": state.metrics.get_uptime_seconds(),
+            "degraded": degraded,
+        },
+        "capture": capture_info,
+        "connections": connections,
+        "models": models,
+        "features": features,
+        "last_error": state._last_error,
+        "last_error_time": state._last_error_time,
     }
 
 
@@ -350,7 +473,17 @@ async def debug_metrics():
     Controlled by features.enable_debug_metrics in prod.
     Contains process-local metrics, NOT nvidia-smi.
     """
+    from fastapi import HTTPException
+
     state = get_app_state()
+
+    # Sprint 1 Task 4: enforce feature flag
+    if not state.config.features.enable_debug_metrics:
+        raise HTTPException(
+            status_code=403,
+            detail="Debug metrics are disabled by configuration.",
+        )
+
     report = state.metrics.get_full_report()
 
     # Registry module listing (factory catalog info)
@@ -370,7 +503,8 @@ async def debug_metrics():
         },
         "llm": {
             "provider": state.config.llm.provider,
-            "model": state.config.llm.model,
+            "model_path": state.config.llm.model_path,
+            "loaded": state.llm.is_loaded if state.llm else False,
         },
     }
 

@@ -1,4 +1,4 @@
-﻿"""
+"""
 VoxDesk — Module Registry Tests
 Factory catalog lifecycle, create, exists, list, error handling.
 """
@@ -107,7 +107,7 @@ class TestRegistryListing:
         reg = ModuleRegistry()
         reg.register("stt", "faster-whisper", lambda: None, requires_gpu=True)
         reg.register("tts", "kokoro", lambda: None, requires_gpu=True)
-        reg.register("llm", "ollama", lambda: None, requires_gpu=False)
+        reg.register("llm", "llama-cpp", lambda: None, requires_gpu=True)
 
         modules = reg.list_modules()
         assert "stt" in modules
@@ -173,12 +173,12 @@ class TestRegistryOverride:
         reg = ModuleRegistry()
         reg.register("stt", "whisper", MagicMock(return_value="stt"))
         reg.register("tts", "kokoro", MagicMock(return_value="tts"))
-        reg.register("llm", "ollama", MagicMock(return_value="llm"))
+        reg.register("llm", "llama-cpp", MagicMock(return_value="llm"))
         reg.register("capture", "dxcam", MagicMock(return_value="cap"))
 
         assert reg.create("stt", "whisper") == "stt"
         assert reg.create("tts", "kokoro") == "tts"
-        assert reg.create("llm", "ollama") == "llm"
+        assert reg.create("llm", "llama-cpp") == "llm"
         assert reg.create("capture", "dxcam") == "cap"
 
     @pytest.mark.unit

@@ -1,4 +1,4 @@
-﻿"""
+"""
 VoxDesk — Capture, WebSocket Manager, Isolation, Hotkey, Tray Tests
 Alt sistemlerin unit testleri — hardware gerektirmez.
 """
@@ -137,6 +137,8 @@ class TestConnectionManager:
         assert mgr.get_connection_count("chat") == 0
         assert mgr.get_connection_count("screen") == 0
         assert mgr.get_connection_count("voice") == 0
+        # Sprint 2: voice_v2 is now initialized at startup
+        assert mgr.get_connection_count("voice_v2") == 0
 
     def test_unknown_channel_count(self):
         """Olmayan kanal → 0."""
@@ -158,6 +160,20 @@ class TestConnectionManager:
         ws = AsyncMock()
         await mgr.connect(ws, "custom_channel")
         assert mgr.get_connection_count("custom_channel") == 1
+
+    @pytest.mark.asyncio
+    async def test_voice_v2_connect_disconnect(self):
+        """Sprint 2: voice_v2 channel connect/disconnect lifecycle."""
+        mgr = ConnectionManager()
+        ws = AsyncMock()
+        # voice_v2 starts at 0
+        assert mgr.get_connection_count("voice_v2") == 0
+        # connect
+        await mgr.connect(ws, "voice_v2")
+        assert mgr.get_connection_count("voice_v2") == 1
+        # disconnect
+        mgr.disconnect(ws, "voice_v2")
+        assert mgr.get_connection_count("voice_v2") == 0
 
     @pytest.mark.asyncio
     async def test_multiple_connections_same_channel(self):
@@ -317,8 +333,6 @@ class TestIsolation:
     def test_env_guards_set(self):
         from src.isolation import _set_env_guards
         _set_env_guards()
-        assert os.environ.get("OLLAMA_NO_CLOUD") == "1"
-        assert os.environ.get("OLLAMA_NO_UPDATE_CHECK") == "1"
         assert os.environ.get("HF_HUB_OFFLINE") == "1"
         assert os.environ.get("TRANSFORMERS_OFFLINE") == "1"
 
@@ -327,7 +341,7 @@ class TestIsolation:
         from src.isolation import _set_env_guards
         _set_env_guards()
         _set_env_guards()
-        assert os.environ.get("OLLAMA_NO_CLOUD") == "1"
+        assert os.environ.get("HF_HUB_OFFLINE") == "1"
 
     def test_verify_isolation_returns_dict(self):
         from src.isolation import verify_isolation

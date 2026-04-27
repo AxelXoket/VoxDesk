@@ -1,10 +1,14 @@
-﻿"""
+"""
 VoxDesk — Binary Audio WebSocket Handler
 /ws/voice/v2 — PCM binary transfer protocol.
 
 Receive loop:
     1. Text frame → JSON dispatch (audio_config, audio_end, audio_cancel)
     2. Binary frame → PCM decode (only after handshake)
+
+Screen capture always-on:
+    Her voice istek ekranı dahil eder. VoxDesk desktop assistant'tır —
+    sesin bağlamı ekrandır. Bu bilinçli bir tasarım kararıdır.
 
 Güvenlik:
     - Binary before handshake → protocol_error
@@ -26,6 +30,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from src.audio_protocol import (
     AudioSession,
+    AudioConfig,
     AudioMessageType,
     MAX_BASE64_BYTES,
     validate_config,
@@ -37,7 +42,7 @@ from src.audio_protocol import (
 
 logger = logging.getLogger("voxdesk.routes.voice_v2")
 
-router = APIRouter(tags=["voice_v2"])
+router = APIRouter(prefix="/api", tags=["voice_v2"])
 
 
 @router.websocket("/ws/voice/v2")
@@ -59,7 +64,7 @@ async def ws_voice_v2(websocket: WebSocket):
 
     session = AudioSession()
     audio_buffer = bytearray()
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
 
     try:
         while True:
@@ -185,6 +190,7 @@ async def ws_voice_v2(websocket: WebSocket):
         logger.debug(f"Voice v2 disconnect — {session.total_chunks} chunks")
     except Exception as e:
         logger.error(f"WS voice v2 hatası: {e}")
+        state.record_error(f"Voice WS: {e}")  # Sprint 3.5
     finally:
         state.ws_manager.disconnect(websocket, "voice_v2")
 
@@ -209,9 +215,26 @@ async def _process_audio_buffer(
         return
 
     # STT (blocking → executor)
-    result = await loop.run_in_executor(
-        None, state.stt.transcribe_audio, audio_array
-    )
+    import time as _time
+    _stt_t0 = _time.perf_counter()
+    try:
+        result = await loop.run_in_executor(
+            None, state.stt.transcribe_audio, audio_array
+        )
+    except Exception as stt_err:
+        logger.error(f"STT error: {stt_err}")
+        state.metrics.increment("stt_errors_total")
+        state.record_error(f"STT: {stt_err}")  # Sprint 3.5
+        await websocket.send_json({
+            "type": "voice_error",
+            "code": "STT_FAILED",
+            "message": "Failed to transcribe speech.",
+            "recoverable": True,
+        })
+        return
+    _stt_ms = (_time.perf_counter() - _stt_t0) * 1000
+    state.metrics.record_latency("stt_decode_ms", _stt_ms)
+
     text = result.get("text", "")
     lang = result.get("language", "unknown")
 
@@ -232,7 +255,21 @@ async def _process_audio_buffer(
         if frame:
             image_bytes = frame.image_bytes
 
-    llm_response = await state.llm.chat(text, image_bytes)
+    try:
+        if state.llm is None:
+            raise RuntimeError("LLM unavailable — local model file missing")
+        llm_response = await state.llm.chat(text, image_bytes)
+    except Exception as llm_err:
+        logger.error(f"Voice LLM error: {llm_err}")
+        state.metrics.increment("llm_errors_total")
+        state.record_error(f"Voice LLM: {llm_err}")  # Sprint 3.5
+        await websocket.send_json({
+            "type": "voice_error",
+            "code": "LLM_FAILED",
+            "message": "Failed to generate voice response.",
+            "recoverable": True,
+        })
+        return
 
     await websocket.send_json({
         "type": "llm_response",
@@ -243,19 +280,34 @@ async def _process_audio_buffer(
     if state.tts and state.tts.enabled:
         import soundfile as sf
 
-        def _produce_tts_chunks():
-            chunks = []
-            for chunk in state.tts.synthesize_stream(llm_response):
-                buf = io.BytesIO()
-                sf.write(buf, chunk, state.tts.sample_rate, format="WAV")
-                chunks.append(base64.b64encode(buf.getvalue()).decode())
-            return chunks
+        try:
+            _tts_t0 = _time.perf_counter()
 
-        tts_chunks = await loop.run_in_executor(None, _produce_tts_chunks)
-        for chunk_b64 in tts_chunks:
+            def _produce_tts_chunks():
+                chunks = []
+                for chunk in state.tts.synthesize_stream(llm_response):
+                    buf = io.BytesIO()
+                    sf.write(buf, chunk, state.tts.sample_rate, format="WAV")
+                    chunks.append(base64.b64encode(buf.getvalue()).decode())
+                return chunks
+
+            tts_chunks = await loop.run_in_executor(None, _produce_tts_chunks)
+            _tts_ms = (_time.perf_counter() - _tts_t0) * 1000
+            state.metrics.record_latency("tts_synthesis_ms", _tts_ms)
+
+            for chunk_b64 in tts_chunks:
+                await websocket.send_json({
+                    "type": "tts_audio",
+                    "audio": chunk_b64,
+                })
+        except Exception as tts_err:
+            logger.error(f"Voice TTS error: {tts_err}")
+            state.metrics.increment("tts_errors_total")
             await websocket.send_json({
-                "type": "tts_audio",
-                "audio": chunk_b64,
+                "type": "voice_error",
+                "code": "TTS_FAILED",
+                "message": "Failed to synthesize speech.",
+                "recoverable": True,
             })
 
 
@@ -292,14 +344,14 @@ async def _handle_legacy_audio(
         )
         return
 
-    # Import route-local decode functions
-    from src.routes.chat import _decode_audio_webm, _decode_audio_raw_pcm
+    # Sprint 3: audio_utils'ten import — chat.py cross-import kaldırıldı
+    from src.audio_utils import decode_audio_webm, decode_audio_raw_pcm
 
     if audio_format == "pcm":
-        audio_array = _decode_audio_raw_pcm(audio_bytes)
+        audio_array = decode_audio_raw_pcm(audio_bytes)
     else:
         audio_array = await loop.run_in_executor(
-            None, _decode_audio_webm, audio_bytes
+            None, decode_audio_webm, audio_bytes
         )
 
     if audio_array is None or len(audio_array) < 4800:
@@ -307,11 +359,9 @@ async def _handle_legacy_audio(
         return
 
     # Delegate to shared pipeline
-    from src.audio_protocol import AudioSession
+    # Sprint 3: __import__ anti-pattern kaldırıldı — AudioConfig zaten import edildi
     temp_session = AudioSession()
-    temp_session.accept_handshake(
-        __import__("src.audio_protocol", fromlist=["AudioConfig"]).AudioConfig()
-    )
+    temp_session.accept_handshake(AudioConfig())
 
     result = await loop.run_in_executor(
         None, state.stt.transcribe_audio, audio_array
@@ -335,7 +385,21 @@ async def _handle_legacy_audio(
         if frame:
             image_bytes = frame.image_bytes
 
-    llm_response = await state.llm.chat(text, image_bytes)
+    try:
+        if state.llm is None:
+            raise RuntimeError("LLM unavailable — local model file missing")
+        llm_response = await state.llm.chat(text, image_bytes)
+    except Exception as llm_err:
+        logger.error(f"Voice legacy LLM error: {llm_err}")
+        state.record_error(f"Voice legacy LLM: {llm_err}")
+        await websocket.send_json({
+            "type": "voice_error",
+            "code": "LLM_FAILED",
+            "message": "Failed to generate voice response.",
+            "recoverable": True,
+        })
+        return
+
     await websocket.send_json({
         "type": "llm_response",
         "text": llm_response,

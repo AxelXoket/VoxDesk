@@ -1,4 +1,4 @@
-﻿"""
+"""
 VoxDesk — Module Registry
 Dependency-injection factory catalog for pluggable engine backends.
 NOT a service locator — no global state, no runtime register/unregister.
@@ -9,7 +9,7 @@ Lifecycle rules:
   - Request path uses ready instances from app.state — NEVER calls create()
   - After startup, registry is effectively immutable — no lock needed
 
-Kind namespaces: stt/faster-whisper, tts/kokoro, llm/ollama, capture/dxcam
+Kind namespaces: stt/faster-whisper, tts/kokoro, llm/llama-cpp, capture/dxcam
 """
 
 from __future__ import annotations

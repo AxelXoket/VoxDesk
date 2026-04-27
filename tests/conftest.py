@@ -40,40 +40,53 @@ def _reset_global_state():
 # ══════════════════════════════════════════════════════════════
 
 @pytest.fixture
-def make_llm():
+def make_llm(tmp_path):
     """
-    Mock config ile VisionLLM factory.
-    Her çağrıda yeni izole instance oluşturur.
+    Mock config ile LlamaCppProvider factory.
+    Fake GGUF dosyası oluşturur — path validation geçer, model yüklemez.
 
     Usage:
         def test_something(make_llm):
-            llm = make_llm(model="test", context_messages=5)
+            llm = make_llm(context_messages=5)
     """
     def _factory(**overrides):
-        from src.llm_client import VisionLLM
+        from src.llm.provider import LlamaCppProvider
+
+        # Create fake model file for path validation
+        fake_model = tmp_path / "test-model.gguf"
+        if not fake_model.exists():
+            fake_model.write_bytes(b"GGUF_FAKE")
 
         defaults = {
-            "model": "test-model",
+            "model_path": str(fake_model),
+            "mmproj_path": None,
             "temperature": 0.7,
             "max_tokens": 1024,
             "context_messages": 5,
-            "fallback_models": [],
+            "n_gpu_layers": -1,
+            "n_ctx": 4096,
+            "chat_format": None,
             "system_prompt": "You are a helpful AI assistant.",
             "personality_name": "voxly",
         }
         defaults.update(overrides)
 
-        with patch("src.llm_client.get_config") as mock_cfg:
-            cfg = MagicMock()
-            cfg.llm.model = defaults["model"]
-            cfg.llm.temperature = defaults["temperature"]
-            cfg.llm.max_tokens = defaults["max_tokens"]
-            cfg.llm.context_messages = defaults["context_messages"]
-            cfg.llm.fallback_models = defaults["fallback_models"]
-            cfg.personality.system_prompt = defaults["system_prompt"]
-            cfg.personality.name = defaults["personality_name"]
-            mock_cfg.return_value = cfg
-            return VisionLLM()
+        mock_config = MagicMock()
+        mock_config.model_path = defaults["model_path"]
+        mock_config.mmproj_path = defaults["mmproj_path"]
+        mock_config.temperature = defaults["temperature"]
+        mock_config.max_tokens = defaults["max_tokens"]
+        mock_config.context_messages = defaults["context_messages"]
+        mock_config.n_gpu_layers = defaults["n_gpu_layers"]
+        mock_config.n_ctx = defaults["n_ctx"]
+        mock_config.chat_format = defaults["chat_format"]
+
+        with patch("src.llm.provider.get_config") as mock_cfg:
+            mock_personality = MagicMock()
+            mock_personality.system_prompt = defaults["system_prompt"]
+            mock_personality.name = defaults["personality_name"]
+            mock_cfg.return_value.personality = mock_personality
+            return LlamaCppProvider(mock_config)
 
     return _factory
 
@@ -133,7 +146,7 @@ def make_fake_audio():
 
 @pytest.fixture
 def mock_websocket():
-    """Fully mocked WebSocket — all send/receive methods."""
+    """Fully mocked WebSocket — all send/receive methods + voice_v2 support."""
     ws = AsyncMock()
     ws.accept = AsyncMock()
     ws.send_json = AsyncMock()
@@ -142,4 +155,10 @@ def mock_websocket():
     ws.receive_json = AsyncMock(return_value={})
     ws.receive_text = AsyncMock(return_value="")
     ws.receive_bytes = AsyncMock(return_value=b"")
+    # Sprint 2: low-level receive() for voice_v2 handler (returns ASGI dict)
+    ws.receive = AsyncMock(return_value={"type": "websocket.disconnect"})
+    # Sprint 2: headers for Origin validation in ConnectionManager
+    ws.headers = {"origin": "http://localhost:8765"}
+    # Sprint 2: close() for connection cleanup
+    ws.close = AsyncMock()
     return ws

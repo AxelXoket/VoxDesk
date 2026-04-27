@@ -10,7 +10,8 @@ import base64
 import numpy as np
 from unittest.mock import MagicMock, AsyncMock, patch
 
-from src.routes.chat import ChatRequest, ChatResponse, _decode_audio_raw_pcm
+from src.routes.chat import ChatRequest, ChatResponse
+from src.audio_utils import decode_audio_raw_pcm, decode_audio_webm
 
 
 # ══════════════════════════════════════════════════════════════
@@ -68,41 +69,40 @@ class TestAudioDecode:
         """Geçerli PCM float32 data → numpy array."""
         original = np.array([0.1, -0.5, 0.9], dtype=np.float32)
         raw_bytes = original.tobytes()
-        result = _decode_audio_raw_pcm(raw_bytes)
+        result = decode_audio_raw_pcm(raw_bytes)
         assert result is not None
         np.testing.assert_array_almost_equal(result, original)
 
     def test_decode_raw_pcm_empty(self):
         """Boş bytes → boş array (crash değil)."""
-        result = _decode_audio_raw_pcm(b"")
+        result = decode_audio_raw_pcm(b"")
         assert result is not None
         assert len(result) == 0
 
     def test_decode_raw_pcm_single_sample(self):
         """Tek sample."""
         single = np.array([0.42], dtype=np.float32)
-        result = _decode_audio_raw_pcm(single.tobytes())
+        result = decode_audio_raw_pcm(single.tobytes())
         assert len(result) == 1
         assert abs(result[0] - 0.42) < 1e-5
 
     def test_decode_raw_pcm_preserves_negative(self):
         """Negatif değerler korunmalı."""
         neg = np.array([-0.99, -0.5, -0.01], dtype=np.float32)
-        result = _decode_audio_raw_pcm(neg.tobytes())
+        result = decode_audio_raw_pcm(neg.tobytes())
         np.testing.assert_array_almost_equal(result, neg)
 
     def test_decode_raw_pcm_silence(self):
         """Sıfır değerli ses."""
         silence = np.zeros(1000, dtype=np.float32)
-        result = _decode_audio_raw_pcm(silence.tobytes())
+        result = decode_audio_raw_pcm(silence.tobytes())
         assert len(result) == 1000
         assert np.all(result == 0)
 
     def test_decode_webm_import_guard(self):
-        """_decode_audio_webm av import hatası → None döndürmeli."""
-        from src.routes.chat import _decode_audio_webm
+        """decode_audio_webm geçersiz data → None döndürmeli."""
         # Geçersiz data → decode hatası → None
-        result = _decode_audio_webm(b"not_valid_webm_data")
+        result = decode_audio_webm(b"not_valid_webm_data")
         assert result is None
 
 
@@ -265,3 +265,178 @@ class TestSettingsModels:
         from src.routes.settings import ModelUpdateRequest
         req = ModelUpdateRequest(model="new-model:latest")
         assert req.model == "new-model:latest"
+
+
+# ══════════════════════════════════════════════════════════════
+#  Sprint 1 — /api/health and /api/status Contract Tests
+# ══════════════════════════════════════════════════════════════
+
+class TestHealthStatusEndpoints:
+    """Sprint 1 Gap 1+2: Health stays minimal, Status has full shape."""
+
+    @pytest.mark.regression
+    def test_health_returns_minimal_fields(self):
+        """Health must NOT include model or capture_running."""
+        from src.main import health
+        import asyncio
+        result = asyncio.run(health())
+        assert "status" in result
+        assert "version" in result
+        assert "uptime_seconds" in result
+        assert "degraded" in result
+        # Must NOT contain runtime state fields
+        assert "model" not in result
+        assert "capture_running" not in result
+        assert "models" not in result
+        assert "features" not in result
+
+    @pytest.mark.regression
+    def test_status_returns_expected_sections(self):
+        """/api/status must have api/capture/connections/models/features/last_error."""
+        from src.main import runtime_status
+        import asyncio
+        result = asyncio.run(runtime_status())
+        assert "api" in result
+        assert "capture" in result
+        assert "connections" in result
+        assert "models" in result
+        assert "features" in result
+        assert "last_error" in result
+
+    @pytest.mark.regression
+    def test_status_models_have_name_and_state(self):
+        from src.main import runtime_status
+        import asyncio
+        result = asyncio.run(runtime_status())
+        for key in ("stt", "llm", "tts"):
+            assert "name" in result["models"][key]
+            assert "state" in result["models"][key]
+
+    @pytest.mark.regression
+    def test_status_features_from_config(self):
+        from src.main import runtime_status
+        import asyncio
+        result = asyncio.run(runtime_status())
+        feats = result["features"]
+        assert "enable_debug_metrics" in feats
+        assert "enable_vram_unload" in feats
+        assert isinstance(feats["enable_debug_metrics"], bool)
+
+    @pytest.mark.regression
+    def test_status_no_secrets_exposed(self):
+        from src.main import runtime_status
+        import asyncio
+        import json
+        result = asyncio.run(runtime_status())
+        result_str = json.dumps(result)
+        assert "API_KEY" not in result_str
+        assert "TOKEN" not in result_str
+        assert "password" not in result_str.lower()
+
+    @pytest.mark.regression
+    def test_status_connections_channels(self):
+        from src.main import runtime_status
+        import asyncio
+        result = asyncio.run(runtime_status())
+        conns = result["connections"]
+        for ch in ("chat", "screen", "voice", "voice_v2"):
+            assert ch in conns
+            assert "count" in conns[ch]
+            assert "state" in conns[ch]
+
+
+class TestDebugMetricsFlag:
+    """Sprint 1 Task 4: enable_debug_metrics enforcement."""
+
+    @pytest.mark.regression
+    def test_debug_metrics_disabled_returns_403(self):
+        """Default enable_debug_metrics=false must raise 403."""
+        from src.main import debug_metrics
+        from fastapi import HTTPException
+        import asyncio
+        with pytest.raises(HTTPException) as exc_info:
+            asyncio.run(debug_metrics())
+        assert exc_info.value.status_code == 403
+
+    @pytest.mark.regression
+    def test_debug_metrics_enabled_returns_report(self):
+        """enable_debug_metrics=true must return full report dict."""
+        from src.main import debug_metrics, get_app_state
+        import asyncio
+        state = get_app_state()
+        original = state.config.features.enable_debug_metrics
+        # Temporarily enable
+        object.__setattr__(state.config.features, "enable_debug_metrics", True)
+        try:
+            result = asyncio.run(debug_metrics())
+            assert isinstance(result, dict)
+            assert "_scope" in result
+        finally:
+            object.__setattr__(state.config.features, "enable_debug_metrics", original)
+
+
+# ══════════════════════════════════════════════════════════════
+#  Sprint 1 — WebSocket Origin Validation Tests
+# ══════════════════════════════════════════════════════════════
+
+class TestCheckOrigin:
+    """Sprint 1 Task 5: check_origin allowlist helper."""
+
+    @pytest.mark.regression
+    def test_exact_origin_match(self):
+        from src.websocket_manager import check_origin
+        allowed = ["http://127.0.0.1:8765", "http://localhost:8765"]
+        assert check_origin("http://127.0.0.1:8765", allowed) is True
+
+    @pytest.mark.regression
+    def test_wildcard_port_localhost(self):
+        from src.websocket_manager import check_origin
+        allowed = ["http://localhost:*"]
+        assert check_origin("http://localhost:8765", allowed) is True
+        assert check_origin("http://localhost:3000", allowed) is True
+
+    @pytest.mark.regression
+    def test_wildcard_port_127(self):
+        from src.websocket_manager import check_origin
+        allowed = ["http://127.0.0.1:*"]
+        assert check_origin("http://127.0.0.1:8765", allowed) is True
+
+    @pytest.mark.regression
+    def test_disallowed_origin_rejected(self):
+        from src.websocket_manager import check_origin
+        allowed = ["http://127.0.0.1:*", "http://localhost:*"]
+        assert check_origin("http://evil.com", allowed) is False
+        assert check_origin("https://attacker.io:8765", allowed) is False
+
+    @pytest.mark.regression
+    def test_missing_origin_allowed(self):
+        """Missing/empty origin = non-browser client, should pass."""
+        from src.websocket_manager import check_origin
+        allowed = ["http://127.0.0.1:*"]
+        assert check_origin("", allowed) is True
+        assert check_origin(None, allowed) is True
+
+
+# ══════════════════════════════════════════════════════════════
+#  Sprint 1 — VRAM Feature Flag Tests
+# ══════════════════════════════════════════════════════════════
+
+class TestVRAMFeatureFlag:
+    """Sprint 1 Task 8: VRAM monitor respects enable_vram_unload."""
+
+    @pytest.mark.regression
+    def test_vram_manager_not_running_by_default(self):
+        """Default enable_vram_unload=false → monitor should NOT be running."""
+        from src.vram_manager import VRAMManager
+        vm = VRAMManager()
+        assert vm._running is False
+
+    @pytest.mark.regression
+    def test_vram_manager_idle_timeout_zero_no_unload(self):
+        """idle_timeout_seconds=0 means unload disabled."""
+        from src.vram_manager import VRAMManager
+        vm = VRAMManager(idle_timeout_seconds=0.0)
+        assert vm.idle_timeout_seconds == 0.0
+        # No models registered, get_report should work
+        report = vm.get_report()
+        assert report["monitor_running"] is False

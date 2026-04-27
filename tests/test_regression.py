@@ -1,4 +1,4 @@
-﻿"""
+"""
 VoxDesk — Regression Test Suite
 Bilinen bug'ların geri dönmemesini, API contract'ların kırılmamasını,
 ve performans baseline'ının korunmasını garanti eder.
@@ -96,8 +96,6 @@ class TestBugRegressions:
         import os
 
         required = [
-            "OLLAMA_NO_CLOUD",
-            "OLLAMA_NO_UPDATE_CHECK",
             "HF_HUB_OFFLINE",
             "TRANSFORMERS_OFFLINE",
         ]
@@ -215,7 +213,7 @@ class TestPrivacyRegression:
     @pytest.mark.regression
     def test_visual_memo_prompt_not_empty(self):
         """Visual memo prompt boş olmamalı."""
-        from src.llm_client import VISUAL_MEMO_PROMPT
+        from src.llm.types import VISUAL_MEMO_PROMPT
         assert len(VISUAL_MEMO_PROMPT) > 50
         assert "ekran" in VISUAL_MEMO_PROMPT.lower() or "detay" in VISUAL_MEMO_PROMPT.lower()
 
@@ -302,13 +300,13 @@ class TestPerformanceBaseline:
         """_build_messages() performans baseline."""
         llm = make_llm(context_messages=10)
 
-        from src.llm_client import ChatMessage
         for i in range(10):
-            llm._history.append(ChatMessage(
-                role="user" if i % 2 == 0 else "assistant",
-                content=f"Test mesajı {i} " * 20,
-                visual_memo=f"Memo {i}" if i % 3 == 0 else None,
-            ))
+            if i % 2 == 0:
+                msg = llm._history.add_user_message(f"Test mesajı {i} " * 20)
+                if i % 3 == 0:
+                    msg.visual_memo = f"Memo {i}"
+            else:
+                llm._history.add_assistant_message(f"Test mesajı {i} " * 20)
 
         result = benchmark(llm._build_messages, "Yeni soru")
         assert len(result) > 0
@@ -328,13 +326,10 @@ class TestPerformanceBaseline:
         """export_history() performans baseline."""
         llm = make_llm()
 
-        from src.llm_client import ChatMessage
         for i in range(100):
-            llm._history.append(ChatMessage(
-                role="user", content=f"Mesaj {i}",
-                visual_memo=f"Memo {i}" if i % 5 == 0 else None,
-                timestamp=time.time(),
-            ))
+            msg = llm._history.add_user_message(f"Mesaj {i}")
+            if i % 5 == 0:
+                msg.visual_memo = f"Memo {i}"
 
         result = benchmark(llm.export_history)
         assert len(result) == 100
@@ -345,3 +340,92 @@ class TestPerformanceBaseline:
         from src.tts import VoiceSynth
         result = benchmark(VoiceSynth.get_available_voices)
         assert len(result) >= 4
+
+
+# ══════════════════════════════════════════════════════════════
+#  Sprint 1 — Static File Regression Guards
+# ══════════════════════════════════════════════════════════════
+
+class TestSprint1StaticGuards:
+    """Sprint 1: Static file content checks for known fixed gaps."""
+
+    # --- Task 3: app.js health/status migration ---
+
+    @pytest.mark.regression
+    def test_app_js_no_data_model_split(self):
+        """app.js must NOT contain data.model.split (Gap 1 fix)."""
+        app_js = Path(__file__).parent.parent / "frontend" / "js" / "app.js"
+        content = app_js.read_text(encoding="utf-8")
+        assert "data.model.split" not in content
+
+    @pytest.mark.regression
+    def test_app_js_fetches_api_status(self):
+        """app.js must fetch /api/status for runtime state."""
+        app_js = Path(__file__).parent.parent / "frontend" / "js" / "app.js"
+        content = app_js.read_text(encoding="utf-8")
+        assert "/api/status" in content
+
+    @pytest.mark.regression
+    def test_app_js_still_fetches_api_health(self):
+        """app.js must still use /api/health for availability."""
+        app_js = Path(__file__).parent.parent / "frontend" / "js" / "app.js"
+        content = app_js.read_text(encoding="utf-8")
+        assert "/api/health" in content
+
+    # --- Task 6: audio-capture.js loading ---
+
+    @pytest.mark.regression
+    def test_index_html_loads_audio_capture_js(self):
+        """index.html must include audio-capture.js."""
+        index = Path(__file__).parent.parent / "frontend" / "index.html"
+        content = index.read_text(encoding="utf-8")
+        assert "audio-capture.js" in content
+
+    @pytest.mark.regression
+    def test_audio_capture_before_app_js(self):
+        """audio-capture.js must appear before app.js in index.html."""
+        index = Path(__file__).parent.parent / "frontend" / "index.html"
+        content = index.read_text(encoding="utf-8")
+        ac_pos = content.find("audio-capture.js")
+        app_pos = content.find("app.js")
+        assert ac_pos != -1, "audio-capture.js not found"
+        assert app_pos != -1, "app.js not found"
+        assert ac_pos < app_pos
+
+    @pytest.mark.regression
+    def test_audio_processor_not_as_script_tag(self):
+        """audio-processor.js must NOT be loaded as normal <script>."""
+        index = Path(__file__).parent.parent / "frontend" / "index.html"
+        content = index.read_text(encoding="utf-8")
+        # Should not have <script src="...audio-processor.js">
+        assert '<script src="/static/js/audio-processor.js">' not in content
+
+    # --- Task 7: voxly.yaml prompt hardening ---
+
+    @pytest.mark.regression
+    def test_voxly_no_never_refuse(self):
+        """voxly.yaml must NOT contain 'Never refuse to help'."""
+        voxly = Path(__file__).parent.parent / "config" / "personalities" / "voxly.yaml"
+        content = voxly.read_text(encoding="utf-8")
+        assert "Never refuse to help" not in content
+
+    @pytest.mark.regression
+    def test_voxly_no_same_language_default(self):
+        """voxly.yaml must NOT instruct same-language as default."""
+        voxly = Path(__file__).parent.parent / "config" / "personalities" / "voxly.yaml"
+        content = voxly.read_text(encoding="utf-8")
+        assert "Respond in the same language" not in content
+
+    @pytest.mark.regression
+    def test_voxly_english_default(self):
+        """voxly.yaml must specify English as default output."""
+        voxly = Path(__file__).parent.parent / "config" / "personalities" / "voxly.yaml"
+        content = voxly.read_text(encoding="utf-8").lower()
+        assert "english" in content
+
+    @pytest.mark.regression
+    def test_voxly_refuses_harmful(self):
+        """voxly.yaml must mention refusal of harmful/unsafe requests."""
+        voxly = Path(__file__).parent.parent / "config" / "personalities" / "voxly.yaml"
+        content = voxly.read_text(encoding="utf-8").lower()
+        assert "refuse" in content or "harmful" in content or "unsafe" in content

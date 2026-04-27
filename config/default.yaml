@@ -12,13 +12,17 @@ capture:
   resize_width: 1920     # Resize before sending to LLM
 
 llm:
-  model: "huihui-ai/minicpm-v4.5-abliterated"
-  fallback_models:
-    - "AliBilge/GLM-4.6V-Flash-abliterated"
-    - "gemma4:e4b"
+  provider: "llama-cpp"
+  model_path: "models/minicpm-v4.5-official/model-q6_k.gguf"
+  mmproj_path: "models/minicpm-v4.5-official/mmproj-f16.gguf"
+  fallback_model_path: null   # abliterated — pending user approval
+  fallback_mmproj_path: null
+  n_gpu_layers: -1            # -1 = full GPU offload
+  n_ctx: 8192                 # Context window
+  chat_format: null           # null = auto-detect from model
   temperature: 0.7
   max_tokens: 2048
-  context_messages: 10   # Send last N messages as context
+  context_messages: 10        # Send last N messages as context
 
 tts:
   engine: "kokoro"
@@ -50,3 +54,45 @@ history:
   max_messages: 500
   auto_save: false        # Enable manually if needed
   save_path: "./data/history/"
+
+# Sprint 1 — Gap 5: Previously unmapped sections (now loaded by load_config)
+
+features:
+  enable_module_registry: true
+  enable_vram_unload: false
+  enable_binary_audio: false
+  enable_audioworklet: false
+  enable_mediarecorder_fallback: true
+  enable_debug_metrics: false
+
+network:
+  bind_host: "127.0.0.1"
+  allowed_ws_origins:
+    - "http://127.0.0.1:*"
+    - "http://localhost:*"
+
+privacy:
+  offline_mode: true
+  allow_cloud_providers: false
+  allow_runtime_model_downloads: false
+  allow_external_telemetry: false
+  allow_cdn_assets: false
+
+model_loading:
+  local_files_only: true
+  fail_if_model_missing: true
+
+security:
+  max_ws_frame_bytes: 65536
+  max_audio_queue_depth: 50
+  max_json_message_bytes: 65536
+  idle_disconnect_seconds: 300
+  max_messages_per_second: 60
+
+vram:
+  monitor_interval_seconds: 30.0
+  stt_idle_unload_seconds: 120.0
+  tts_idle_unload_seconds: 120.0
+  min_loaded_seconds: 30.0
+  unload_cooldown_seconds: 10.0
+  keep_warm: false

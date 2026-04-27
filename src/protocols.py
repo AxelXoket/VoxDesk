@@ -1,4 +1,4 @@
-﻿"""
+"""
 VoxDesk — Engine Protocols
 Structural typing contracts for all pluggable engine backends.
 Implementations satisfy these protocols implicitly (duck typing).
@@ -6,7 +6,7 @@ Implementations satisfy these protocols implicitly (duck typing).
 Protocol'ler mevcut engine class'larından türetilmiştir:
   - SpeechRecognizer → STTEngine
   - VoiceSynth → TTSEngine
-  - VisionLLM → LLMProvider
+  - LlamaCppProvider → LLMProvider
   - ScreenCapture → CaptureBackend
 
 Her Protocol'de:
