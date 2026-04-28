@@ -1,4 +1,4 @@
-﻿"""
+"""
 VoxDesk — Audio Binary Protocol v1
 WebSocket üzerinden PCM audio transfer protokolü.
 
@@ -43,8 +43,26 @@ BYTES_PER_SAMPLE = 2  # 16-bit = 2 bytes
 SAMPLES_PER_CHUNK = int(SAMPLE_RATE * CHUNK_MS / 1000)  # 320
 BYTES_PER_CHUNK = SAMPLES_PER_CHUNK * BYTES_PER_SAMPLE   # 640
 
-# Limits
-MAX_FRAME_BYTES = 64 * 1024      # 64KB — single frame limit
+# Limits — backed by SecurityConfig (see src/config.py)
+def _get_security_config():
+    """Lazy config read — avoids import cycle."""
+    try:
+        from src.config import get_config
+        return get_config().security
+    except Exception:
+        return None
+
+def get_max_frame_bytes() -> int:
+    """Max single WS binary frame size."""
+    sec = _get_security_config()
+    return sec.max_ws_frame_bytes if sec else 64 * 1024
+
+def get_max_json_message_bytes() -> int:
+    """Max single WS JSON message size."""
+    sec = _get_security_config()
+    return sec.max_json_message_bytes if sec else 64 * 1024
+
+MAX_FRAME_BYTES = 64 * 1024      # 64KB — fallback default (config overrides at runtime)
 MAX_BASE64_BYTES = 256 * 1024    # 256KB — legacy base64 limit
 MIN_FRAME_BYTES = 2              # At least 1 sample
 
@@ -128,8 +146,9 @@ def validate_binary_frame(data: bytes) -> tuple[bool, str | None]:
     if len(data) < MIN_FRAME_BYTES:
         return False, f"Frame çok küçük: {len(data)} bytes (min: {MIN_FRAME_BYTES})"
 
-    if len(data) > MAX_FRAME_BYTES:
-        return False, f"Frame çok büyük: {len(data)} bytes (max: {MAX_FRAME_BYTES})"
+    if len(data) > get_max_frame_bytes():
+        max_bytes = get_max_frame_bytes()
+        return False, f"Frame çok büyük: {len(data)} bytes (max: {max_bytes})"
 
     if len(data) % BYTES_PER_SAMPLE != 0:
         return False, f"Tek byte sayısı: {len(data)} — 16-bit alignment gerekli"

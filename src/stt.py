@@ -31,21 +31,25 @@ class SpeechRecognizer:
     def __init__(
         self,
         model_name: str = "large-v3-turbo",
+        model_path: str | None = None,
         device: str = "cuda",
         compute_type: str = "float16",
         language: str | None = None,
         vad_enabled: bool = True,
         activation_threshold_db: float = -30.0,
+        initial_prompt: str | None = None,
         min_loaded_seconds: float = 30.0,
         unload_cooldown_seconds: float = 10.0,
         keep_warm: bool = False,
     ):
         self.model_name = model_name
+        self.model_path = model_path  # Local CTranslate2 path (overrides hub)
         self.device = device
         self.compute_type = compute_type
         self.language = language
         self.vad_enabled = vad_enabled
         self.activation_threshold_db = activation_threshold_db
+        self.initial_prompt = initial_prompt  # Domain vocabulary for Whisper
 
         self._model = None
         self._audio_queue: queue.Queue = queue.Queue()
@@ -81,6 +85,7 @@ class SpeechRecognizer:
                 audio_data,
                 language=self.language,  # None = auto-detect
                 vad_filter=self.vad_enabled,
+                initial_prompt=self.initial_prompt,  # Domain vocabulary
                 vad_parameters=dict(
                     min_silence_duration_ms=500,
                     speech_pad_ms=200,
@@ -186,6 +191,11 @@ class SpeechRecognizer:
         db = 20 * np.log10(max(rms, 1e-10))
         return db > self.activation_threshold_db
 
+    def set_initial_prompt(self, prompt: str | None) -> None:
+        """Domain vocabulary'yi güncelle — personality değişiminde çağrılır."""
+        self.initial_prompt = prompt or None
+        logger.info(f"STT initial_prompt güncellendi: {str(self.initial_prompt)[:80]}")
+
     @property
     def is_listening(self) -> bool:
         return self._is_listening
@@ -226,18 +236,22 @@ class _STTLifecycle(ManagedModel):
         self._owner = owner
 
     def _do_load(self):
-        """Whisper modelini yükle (lokal dosyadan)."""
+        """Whisper modelini yükle (lokal dosyadan veya hub'dan)."""
         from faster_whisper import WhisperModel
 
+        # Local path varsa onu kullan, yoksa hub model adı
+        model_id = self._owner.model_path or self._owner.model_name
+
         model = WhisperModel(
-            self._owner.model_name,
+            model_id,
             device=self._owner.device,
             compute_type=self._owner.compute_type,
+            local_files_only=True,
         )
         self._owner._model = model
         logger.info(
             f"✅ Whisper modeli yüklendi: "
-            f"{self._owner.model_name} ({self._owner.device})"
+            f"{model_id} ({self._owner.device})"
         )
         return model
 

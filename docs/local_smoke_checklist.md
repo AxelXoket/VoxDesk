@@ -1,6 +1,6 @@
 # VoxDesk — Local Smoke Checklist
 
-> Sprint 4 kurulum sonrası gerçek donanımda doğrulanmış maddeler.
+> Sprint 5.3 kurulum sonrası gerçek donanımda doğrulanmış maddeler.
 > Bu çalıştırma kodu DEĞİL, manual verification listesidir.
 
 ---
@@ -14,11 +14,11 @@
 
 ## 1. Import Smoke
 
-- [ ] `python -c "import torch; print(torch.__version__)"` → 2.7+
+- [ ] `python -c "import torch; print(torch.__version__)"` → 2.11+
 - [ ] `python -c "import faster_whisper"` → no error
 - [ ] `python -c "import kokoro"` → no error
 - [ ] `python -c "import dxcam"` → no error
-- [ ] `python -c "from src.config import load_config; load_config()"` → no error
+- [ ] `python -c "from src.config import get_config; get_config()"` → no error
 
 ## 2. CUDA Smoke
 
@@ -43,13 +43,13 @@
 
 ## 5. Backend Boot Smoke
 
-- [ ] `python -m src.main` → server starts on 127.0.0.1:8000
-- [ ] `curl http://127.0.0.1:8000/api/health` → `{"status":"ok"}`
-- [ ] `curl http://127.0.0.1:8000/api/status` → JSON with models/features/capture
+- [ ] `python run.py` → server starts on 127.0.0.1:8765
+- [ ] `curl http://127.0.0.1:8765/api/health` → `{"status":"ok"}`
+- [ ] `curl http://127.0.0.1:8765/api/status` → JSON with models/features/capture
 
 ## 6. Frontend Smoke
 
-- [ ] Open `http://127.0.0.1:8000` in browser → UI loads
+- [ ] Open `http://127.0.0.1:8765` in browser → UI loads
 - [ ] Status bar shows model name → `Aktif — modelname`
 - [ ] DEV HUD visible → shows metrics
 - [ ] Screen preview shows captured frame
@@ -80,5 +80,5 @@
 
 ## Pass Criteria
 
-ALL items checked → Sprint 4 ready.
+ALL items checked → Sprint 5.3 ready.
 ANY unchecked → document issue, assess impact, fix or accept known limitation before proceeding.

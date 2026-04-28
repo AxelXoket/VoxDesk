@@ -27,30 +27,20 @@ def _set_env_guards() -> None:
         logger.debug(f"İzolasyon guard: {key}={value}")
 
 
-def _test_outbound_connection() -> bool:
-    """
-    Dış dünyaya bağlantı olup olmadığını test et.
-    Returns True if internet is reachable (WARNING), False if isolated (OK).
-    """
-    try:
-        sock = socket.create_connection(("8.8.8.8", 53), timeout=3)
-        sock.close()
-        return True  # İnternet erişilebilir
-    except (socket.timeout, OSError):
-        return False  # İzole — güvenli
-
-
 def verify_isolation() -> dict:
     """
     Tam izolasyon doğrulaması yap.
     İndirme sonrası çalışma zamanında çağrılır.
+
+    NOT: Outbound bağlantı testi yapılmaz — privacy-first politika gereği
+    startup'ta hiçbir dış bağlantı açılmaz. Env guard'lar asıl enforcement
+    mekanizmasıdır.
 
     Returns:
         dict: İzolasyon durumu raporu
     """
     report = {
         "env_guards_set": False,
-        "internet_blocked": False,
         "status": "UNKNOWN",
     }
 
@@ -59,20 +49,20 @@ def verify_isolation() -> dict:
     report["env_guards_set"] = True
     logger.info("✅ Environment guard'ları aktif")
 
-    # 2. Outbound bağlantı testi
-    internet_reachable = _test_outbound_connection()
-    report["internet_blocked"] = not internet_reachable
+    # 2. Guard'ları doğrula
+    hf_offline = os.environ.get("HF_HUB_OFFLINE") == "1"
+    tf_offline = os.environ.get("TRANSFORMERS_OFFLINE") == "1"
 
-    if internet_reachable:
+    if hf_offline and tf_offline:
+        report["status"] = "OK"
+        logger.info("🔒 İzolasyon aktif — tüm env guard'lar set edildi")
+    else:
         report["status"] = "WARNING"
         logger.warning(
-            "⚠️  İNTERNET ERİŞİLEBİLİR — Veriler güvende ama tam izolasyon için "
-            "internet bağlantısını kesmeniz önerilir. "
-            "Env guard'lar aktif, hiçbir bileşen dışarıya bağlanmayacak."
+            "⚠️  Bazı env guard'lar eksik — izolasyon tam değil. "
+            f"HF_HUB_OFFLINE={os.environ.get('HF_HUB_OFFLINE')}, "
+            f"TRANSFORMERS_OFFLINE={os.environ.get('TRANSFORMERS_OFFLINE')}"
         )
-    else:
-        report["status"] = "OK"
-        logger.info("🔒 Tam izolasyon aktif — İnternet erişimi yok, veriler güvende")
 
     # 3. Bileşen durumlarını logla
     logger.info(f"   HF_HUB_OFFLINE={os.environ.get('HF_HUB_OFFLINE')}")

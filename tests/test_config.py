@@ -329,7 +329,7 @@ class TestConfigMappingSprint1:
         })
         assert cfg.vram.monitor_interval_seconds == 10.0
         assert cfg.vram.keep_warm is True
-        assert cfg.vram.stt_idle_unload_seconds == 120.0  # default
+        assert cfg.vram.stt_idle_unload_seconds == 180.0  # default (3 dk)
 
     @pytest.mark.regression
     def test_missing_sections_use_defaults(self, tmp_path):

@@ -8,20 +8,21 @@ app:
 capture:
   interval_seconds: 1.0
   buffer_size: 30        # Last 30 frames (ring buffer)
-  jpeg_quality: 85
-  resize_width: 1920     # Resize before sending to LLM
+  jpeg_quality: 85          # Good balance for text/code readability
+  resize_width: 1280        # Resize from native 2560px — faster inference, less context usage
 
 llm:
   provider: "llama-cpp"
-  model_path: "models/minicpm-v4.5-official/model-q6_k.gguf"
-  mmproj_path: "models/minicpm-v4.5-official/mmproj-f16.gguf"
-  fallback_model_path: null   # abliterated — pending user approval
-  fallback_mmproj_path: null
+  model_path: "models/Qwen2.5-VL-7B/Qwen_Qwen2.5-VL-7B-Instruct-Q8_0.gguf"
+  mmproj_path: "models/Qwen2.5-VL-7B/mmproj-Qwen_Qwen2.5-VL-7B-Instruct-f16.gguf"
+  fallback_model_path: "models/gemma-4-E4B-official/gemma-4-E4B-it-Q8_0.gguf"
+  fallback_mmproj_path: "models/gemma-4-E4B-official/mmproj-gemma-4-E4B-it-bf16.gguf"
   n_gpu_layers: -1            # -1 = full GPU offload
-  n_ctx: 8192                 # Context window
+  n_ctx: 8192                 # 16GB VRAM budget
   chat_format: null           # null = auto-detect from model
-  temperature: 0.7
-  max_tokens: 2048
+  temperature: 0.4
+  max_tokens: 512
+  repeat_penalty: 1.15             # Prevent repetition loops (InternVL3 prone to this)
   context_messages: 10        # Send last N messages as context
 
 tts:
@@ -34,10 +35,17 @@ tts:
 stt:
   engine: "faster-whisper"
   model: "large-v3-turbo"
+  model_path: "models/whisper-large-v3-turbo"   # CTranslate2 format — lokal, faster-whisper uyumlu
   device: "cuda"
   compute_type: "float16"
-  language: null          # null = auto-detect
+  language: null          # null = auto-detect TR/EN
   vad_enabled: true
+
+translator:
+  engine: "marian"
+  model_path: "models/opus-mt-tr-en"
+  device: "cuda"
+  enabled: false          # LLM handles multilingual natively — translator dormant
 
 voice_activation:
   enabled: false
@@ -47,6 +55,7 @@ hotkeys:
   activate: "ctrl+shift+space"
   toggle_listen: "ctrl+shift+v"
   push_to_talk: "ctrl+shift+b"
+  pin_screen: "ctrl+shift+s"
 
 personality: "voxly"      # Personality file under config/personalities/
 
@@ -59,7 +68,7 @@ history:
 
 features:
   enable_module_registry: true
-  enable_vram_unload: false
+  enable_vram_unload: true
   enable_binary_audio: false
   enable_audioworklet: false
   enable_mediarecorder_fallback: true
@@ -91,8 +100,9 @@ security:
 
 vram:
   monitor_interval_seconds: 30.0
-  stt_idle_unload_seconds: 120.0
-  tts_idle_unload_seconds: 120.0
+  stt_idle_unload_seconds: 180.0         # 3 dk idle → offload
+  tts_idle_unload_seconds: 180.0         # 3 dk idle → offload
+  translator_idle_unload_seconds: 180.0  # 3 dk idle → offload
   min_loaded_seconds: 30.0
   unload_cooldown_seconds: 10.0
   keep_warm: false

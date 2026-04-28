@@ -82,10 +82,11 @@ def make_llm(tmp_path):
         mock_config.chat_format = defaults["chat_format"]
 
         with patch("src.llm.provider.get_config") as mock_cfg:
-            mock_personality = MagicMock()
-            mock_personality.system_prompt = defaults["system_prompt"]
-            mock_personality.name = defaults["personality_name"]
-            mock_cfg.return_value.personality = mock_personality
+            from src.config import PersonalityConfig
+            mock_cfg.return_value.personality = PersonalityConfig(
+                system_prompt=defaults["system_prompt"],
+                name=defaults["personality_name"],
+            )
             return LlamaCppProvider(mock_config)
 
     return _factory

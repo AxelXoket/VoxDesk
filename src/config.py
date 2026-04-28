@@ -44,6 +44,7 @@ class LLMConfig(BaseModel):
     # Shared inference params
     temperature: float = 0.7
     max_tokens: int = 2048
+    repeat_penalty: float = 1.1     # Prevent repetition loops
     context_messages: int = 10
     # Sprint 3: multi-frame vision — 3D-Resampler doğrulandıktan sonra artır
     llm_frame_count: int = 1
@@ -62,10 +63,20 @@ class STTConfig(BaseModel):
     model_config = ConfigDict(extra='forbid')
     engine: str = "faster-whisper"
     model: str = "large-v3-turbo"
+    model_path: str | None = None  # Local CT2 path (overrides hub model name)
     device: str = "cuda"
     compute_type: str = "float16"
     language: str | None = None  # None = auto-detect
     vad_enabled: bool = True
+
+
+class TranslatorConfig(BaseModel):
+    """MarianMT (opus-mt-tr-en) translator configuration."""
+    model_config = ConfigDict(extra='forbid')
+    engine: str = "marian"
+    model_path: str = "models/opus-mt-tr-en"
+    device: str = "cuda"
+    enabled: bool = True
 
 
 class VoiceActivationConfig(BaseModel):
@@ -79,6 +90,7 @@ class HotkeyConfig(BaseModel):
     activate: str = "ctrl+shift+space"
     toggle_listen: str = "ctrl+shift+v"
     push_to_talk: str = "ctrl+shift+b"
+    pin_screen: str = "ctrl+shift+s"
 
 
 class HistoryConfig(BaseModel):
@@ -95,7 +107,13 @@ class PersonalityConfig(BaseModel):
     voice: str = "af_heart"
     tone: str = "professional"
     greeting: str = "Hello! Voxly is online and ready to assist."
-    system_prompt: str = ""
+
+    # ── Modüler Prompt Bölümleri ─────────────────────────────
+    system_prompt: str = ""           # Ana davranış kuralları ve kişilik tanımı
+    stt_context: str = ""             # Whisper initial_prompt — domain vocabulary
+    screen_analysis_prompt: str = ""  # Ekran yorumlama talimatları
+    emotion_rules: str = ""           # Duygu algılama/yansıtma filtresi
+    response_format: str = ""         # Çıktı biçim kuralları (voice vs text)
 
 
 # ── Privacy & Security Configs ───────────────────────────────
@@ -131,7 +149,7 @@ class FeaturesConfig(BaseModel):
     """Feature flags — restart-only, no runtime toggle."""
     model_config = ConfigDict(extra='forbid')
     enable_module_registry: bool = True
-    enable_vram_unload: bool = False
+    enable_vram_unload: bool = True
     enable_binary_audio: bool = False
     enable_audioworklet: bool = False
     enable_mediarecorder_fallback: bool = True
@@ -155,8 +173,9 @@ class VRAMConfig(BaseModel):
     """
     model_config = ConfigDict(extra='forbid')
     monitor_interval_seconds: float = 30.0
-    stt_idle_unload_seconds: float = 120.0   # 0 = disable
-    tts_idle_unload_seconds: float = 120.0   # 0 = disable
+    stt_idle_unload_seconds: float = 180.0         # 3 dk idle → offload
+    tts_idle_unload_seconds: float = 180.0         # 3 dk idle → offload
+    translator_idle_unload_seconds: float = 180.0  # 3 dk idle → offload
     min_loaded_seconds: float = 30.0
     unload_cooldown_seconds: float = 10.0
     keep_warm: bool = False
@@ -184,6 +203,7 @@ class AppConfig(BaseModel):
     features: FeaturesConfig = Field(default_factory=FeaturesConfig)
     security: SecurityConfig = Field(default_factory=SecurityConfig)
     vram: VRAMConfig = Field(default_factory=VRAMConfig)
+    translator: TranslatorConfig = Field(default_factory=TranslatorConfig)
 
 
 def load_personality(name: str) -> PersonalityConfig:
@@ -227,6 +247,7 @@ def load_config() -> AppConfig:
             "features": raw.get("features", {}),
             "security": raw.get("security", {}),
             "vram": raw.get("vram", {}),
+            "translator": raw.get("translator", {}),
         }
 
     config = AppConfig(**config_data)

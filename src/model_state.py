@@ -1,4 +1,4 @@
-﻿"""
+"""
 VoxDesk — Model State Machine
 STT/TTS gibi GPU-bound modellerin güvenli lifecycle yönetimi.
 
@@ -76,6 +76,9 @@ class ManagedModel:
 
         # Single lock — tek otorite
         self._lock = threading.Lock()
+        # Event for load-wait coordination (set when not loading)
+        self._load_event = threading.Event()
+        self._load_event.set()  # Initially not loading
 
         # Protected state — sadece _lock altında mutate
         self._state = ModelState.UNLOADED
@@ -134,38 +137,63 @@ class ManagedModel:
     def load(self) -> bool:
         """
         Modeli yükle. Zaten yüklüyse no-op (True döner).
+        Başka bir thread yüklüyorsa, bitmesini bekler.
         Returns True if model is now loaded, False if load failed.
         """
+        should_wait = False
+        should_load = False
+
         with self._lock:
             # Zaten yüklü — duplicate load protection
             if self._state in (ModelState.LOADED, ModelState.IN_USE):
                 logger.debug(f"[{self.name}] zaten yüklü — skip")
                 return True
 
-            # Loading durumunda beklemeli ama basitlik için false
+            # Loading durumunda: bekle
             if self._state == ModelState.LOADING:
-                logger.debug(f"[{self.name}] zaten yükleniyor — skip")
-                return False
+                logger.debug(f"[{self.name}] zaten yükleniyor — bekleniyor")
+                should_wait = True
 
-            if not self._transition(ModelState.LOADING):
+            elif not self._transition(ModelState.LOADING):
                 return False
+            else:
+                # Bu thread yükleme sahipliğini aldı
+                self._load_event.clear()
+                should_load = True
 
-        # Load işlemi lock DIŞINDA — I/O blocking olabilir
-        try:
-            model = self._do_load()
-            with self._lock:
-                self._model = model
-                self._transition(ModelState.LOADED)
-                self._loaded_at = time.monotonic()
-                self._last_used = time.monotonic()
-                self._error = None
+        # Lock DIŞINDA — I/O blocking
+        if should_load:
+            try:
+                model = self._do_load()
+                with self._lock:
+                    self._model = model
+                    self._transition(ModelState.LOADED)
+                    self._loaded_at = time.monotonic()
+                    self._last_used = time.monotonic()
+                    self._error = None
                 return True
-        except Exception as e:
+            except Exception as e:
+                with self._lock:
+                    self._transition(ModelState.ERROR)
+                    self._error = str(e)
+                logger.error(f"[{self.name}] load hatası: {e}")
+                return False
+            finally:
+                self._load_event.set()  # Bekleyenleri uyandır
+
+        if should_wait:
+            # LOADING state'e geldik ama sahip biz değiliz — bekle
+            logger.debug(f"[{self.name}] mevcut load işlemi bekleniyor...")
+            self._load_event.wait(timeout=120.0)  # Max 2 dakika bekle
+
             with self._lock:
-                self._transition(ModelState.ERROR)
-                self._error = str(e)
-            logger.error(f"[{self.name}] load hatası: {e}")
-            return False
+                if self._state in (ModelState.LOADED, ModelState.IN_USE):
+                    logger.debug(f"[{self.name}] bekleme sonrası yüklü — OK")
+                    return True
+                logger.warning(f"[{self.name}] bekleme sonrası state: {self._state.value}")
+                return False
+
+        return False
 
     def safe_unload(self) -> bool:
         """

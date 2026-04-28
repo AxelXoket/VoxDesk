@@ -1,10 +1,11 @@
 # VoxDesk Architecture — Production Reference
 
-> **Version**: v0.2.0 — Sprint 4: Pure Local LlamaCppProvider  
+> **Version**: v0.5.0 — Sprint 5.3: Runtime Hardening + Race Condition Fix  
 > **Runtime**: Python 3.12 + FastAPI + Uvicorn  
-> **Inference**: Local-only (Whisper STT, Kokoro TTS, llama-cpp-python LLM)  
+> **Inference**: Local-only (Whisper STT, MarianMT Translator, Kokoro TTS, llama-cpp-python LLM)  
 > **GPU**: RTX 5080 (Blackwell, SM 12.0) — CUDA 12.8  
-> **Audio**: PCM binary WebSocket (v1) + legacy base64 fallback
+> **Audio**: PCM binary WebSocket (v1) + legacy base64 fallback  
+> **Voice Pipeline**: Mic → STT (auto-detect TR/EN) → Translator (TR→EN) → LLM (EN) → TTS (EN) → Speaker
 
 ---
 
@@ -15,7 +16,7 @@
 
 ### Guarantees
 
-- **No cloud inference**: All STT, TTS, and LLM run from local model files
+- **No cloud inference**: All STT, TTS, Translator, and LLM run from local model files
 - **No telemetry**: No usage data, metrics, or logs sent externally
 - **No CDN**: No external scripts, fonts, or stylesheets
 - **No runtime downloads**: Models must be pre-installed; missing = fail
@@ -70,7 +71,7 @@ Binary PCM audio transfer over WebSocket at `/ws/voice/v2`.
 | Sample rate | 16000 Hz |
 | Channels | 1 (mono) |
 | Chunk duration | 20ms (320 samples = 640 bytes) |
-| Max frame | 64 KB |
+| Max frame | 64 KB (config-backed via `SecurityConfig.max_ws_frame_bytes`) |
 | Sequence counter | Server-side only |
 | Client timestamp | None (v1) |
 | Protocol version | 1 |
@@ -135,7 +136,7 @@ Client                              Server
 
 1. **Even byte count** — 16-bit samples require `len(data) % 2 == 0`
 2. **Min size** — At least 2 bytes (1 sample)
-3. **Max size** — 64 KB per frame
+3. **Max size** — Config-backed via `SecurityConfig.max_ws_frame_bytes` (default 64 KB)
 4. **Handshake required** — Binary frames rejected before `audio_config`
 
 ### PCM Decode
@@ -225,8 +226,8 @@ UNLOADED ──load()──► LOADING ──success──► LOADED
 ```yaml
 vram:
   monitor_interval_seconds: 30.0
-  stt_idle_unload_seconds: 120.0    # 0 = disable
-  tts_idle_unload_seconds: 120.0    # 0 = disable
+  stt_idle_unload_seconds: 180.0    # 0 = disable
+  tts_idle_unload_seconds: 180.0    # 0 = disable
   min_loaded_seconds: 30.0
   unload_cooldown_seconds: 10.0
   keep_warm: false
@@ -260,7 +261,7 @@ Minimal, safe to expose. **No** model names, paths, VRAM, or registry info.
 ```json
 {
   "status": "ok",
-  "version": "0.2.0",
+  "version": "0.5.0",
   "uptime_seconds": 42.5,
   "degraded": false
 }
@@ -274,7 +275,7 @@ Safe runtime snapshot with model states, capture status, connections, and featur
 {
   "api": {
     "status": "ok",
-    "version": "0.2.0",
+    "version": "0.5.0",
     "uptime_seconds": 42.5,
     "degraded": false
   },
@@ -344,8 +345,8 @@ python -m pytest tests/test_audio_protocol.py -v
 
 | Marker | Count | Purpose |
 |:---|:---:|:---|
-| `unit` | ~300 | Core logic |
-| `regression` | ~60 | Privacy, isolation, config mapping, endpoint contracts, prompt safety |
+| `unit` | ~175 | Core logic |
+| `regression` | ~83 | Privacy, isolation, config mapping, endpoint contracts, prompt safety, audit fixes |
 | `benchmark` | 4 | Performance baselines |
 | `gpu` | 1 | GPU smoke (skipped if no CUDA) |
 
@@ -395,4 +396,4 @@ async def _safe_shutdown():
     # Individual failures don't crash other cleanups
 ```
 
-`_safe_shutdown()` is async — properly awaits `vram_manager.stop_monitor()` and `llm.aclose()`.
+`_safe_shutdown()` is async — properly awaits `vram_manager.stop_monitor()`. Shutdown order: VRAM → Capture → STT → TTS → Translator → LLM → Hotkeys → Tray.

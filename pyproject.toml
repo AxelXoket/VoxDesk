@@ -1,6 +1,6 @@
 [project]
 name = "voxdesk"
-version = "0.2.0"
+version = "0.5.0"
 description = "VoxDesk — Local-only AI desktop assistant with screen analysis and voice chat"
 requires-python = ">=3.12"
 dependencies = [
@@ -20,6 +20,10 @@ dependencies = [
     "numpy>=2.0,<3",
     "websockets>=14.0",
     "av>=14.0",
+    # Translator (MarianMT TR→EN)
+    "transformers>=4.40.0",
+    "sentencepiece>=0.2.0",
+    "sacremoses>=2.1.0",
 ]
 
 [project.scripts]

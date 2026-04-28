@@ -7,7 +7,7 @@ runtime_checkable + structural typing ile isinstance check.
 import pytest
 from unittest.mock import MagicMock, AsyncMock
 
-from src.protocols import STTEngine, TTSEngine, LLMProvider, CaptureBackend
+from src.protocols import STTEngine, TTSEngine, LLMProvider, CaptureBackend, TranslatorEngine
 
 
 # ══════════════════════════════════════════════════════════════
@@ -24,6 +24,7 @@ class TestProtocolDefinitions:
         assert TTSEngine is not None
         assert LLMProvider is not None
         assert CaptureBackend is not None
+        assert TranslatorEngine is not None
 
     @pytest.mark.unit
     def test_protocols_are_runtime_checkable(self):
@@ -207,3 +208,47 @@ class TestLLMProtocol:
         has_health = hasattr(llm, "health")
         if not has_aclose:
             pytest.skip("LlamaCppProvider.aclose() henüz yok — Phase 3'te eklenecek")
+
+    @pytest.mark.unit
+    def test_llm_response_mode_in_protocol(self):
+        """LLMProvider protocol'ü response_mode parametresini içermeli."""
+        import inspect
+        sig = inspect.signature(LLMProvider.chat)
+        assert "response_mode" in sig.parameters, "LLMProvider.chat response_mode eksik"
+        sig_stream = inspect.signature(LLMProvider.chat_stream)
+        assert "response_mode" in sig_stream.parameters, "LLMProvider.chat_stream response_mode eksik"
+
+
+# ══════════════════════════════════════════════════════════════
+#  TranslatorEngine Protocol Compliance
+# ══════════════════════════════════════════════════════════════
+
+class TestTranslatorProtocol:
+    """Translator TranslatorEngine protocol'üne uymalı."""
+
+    @pytest.mark.unit
+    def test_translator_has_required_methods(self):
+        """Translator gerekli tüm method'lara sahip olmalı."""
+        from src.translator import Translator
+        translator = Translator(model_path="models/opus-mt-tr-en", enabled=False)
+
+        required_methods = ["translate", "health", "close"]
+        for method in required_methods:
+            assert hasattr(translator, method), f"Translator method eksik: {method}"
+            assert callable(getattr(translator, method)), f"Translator {method} callable değil"
+
+    @pytest.mark.unit
+    def test_translator_satisfies_protocol(self):
+        """Translator isinstance(TranslatorEngine) olmalı."""
+        from src.translator import Translator
+        translator = Translator(model_path="models/opus-mt-tr-en", enabled=False)
+        assert isinstance(translator, TranslatorEngine)
+
+    @pytest.mark.unit
+    def test_translator_lifecycle_methods(self):
+        """Translator ManagedModel lifecycle proxy method'ları olmalı."""
+        from src.translator import Translator
+        translator = Translator(model_path="models/opus-mt-tr-en", enabled=False)
+        assert callable(translator.safe_unload)
+        assert callable(translator.acquire)
+        assert callable(translator.release)

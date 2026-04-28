@@ -138,9 +138,37 @@ class LlamaCppProvider:
             "verbose": False,
         }
 
-        # Vision support — mmproj varsa clip model olarak ekle
+        # Vision support — mmproj varsa clip model + chat handler ekle
         if self._mmproj_path:
             kwargs["clip_model_path"] = str(self._mmproj_path)
+            # Model-aware handler selection
+            model_lower = self._model_path.name.lower()
+            handler_map = {
+                "qwen": "Qwen25VLChatHandler",
+                "gemma": "Gemma3ChatHandler",
+                "minicpm": "MiniCPMv26ChatHandler",
+                "llava": "Llava16ChatHandler",
+            }
+            handler_name = None
+            for key, name in handler_map.items():
+                if key in model_lower:
+                    handler_name = name
+                    break
+            
+            if handler_name:
+                try:
+                    import importlib
+                    mod = importlib.import_module("llama_cpp.llama_chat_format")
+                    HandlerClass = getattr(mod, handler_name)
+                    kwargs["chat_handler"] = HandlerClass(
+                        clip_model_path=str(self._mmproj_path),
+                        verbose=False,
+                    )
+                    logger.info(f"Vision handler: {handler_name}")
+                except (AttributeError, ImportError) as e:
+                    logger.warning(f"{handler_name} not available: {e} — using auto-detect")
+            else:
+                logger.warning(f"No handler mapped for {self._model_path.name} — using auto-detect")
 
         # Chat format — None ise model metadata'dan auto-detect
         if self._config.chat_format:
@@ -182,14 +210,49 @@ class LlamaCppProvider:
 
     # ── Message Building ──────────────────────────────────────
 
-    def _build_system_prompt(self) -> str:
-        """Kişilik profilinden system prompt oluştur."""
-        return self._personality.system_prompt
+    def _build_system_prompt(self, response_mode: str = "text") -> str:
+        """
+        Kişilik profilinden modüler system prompt oluştur.
+
+        Bölümler:
+          1. system_prompt     — Ana kişilik ve davranış kuralları
+          2. screen_analysis   — Ekran yorumlama talimatları
+          3. emotion_rules     — Duygu algılama/yansıtma filtresi
+          4. response_format   — Çıktı biçim kuralları
+
+        Args:
+            response_mode: "voice" veya "text" — format kurallarını belirler
+        """
+        p = self._personality
+        sections: list[str] = []
+
+        # 1. Core identity
+        if p.system_prompt:
+            sections.append(p.system_prompt.strip())
+
+        # 2. Screen analysis
+        if p.screen_analysis_prompt:
+            sections.append(p.screen_analysis_prompt.strip())
+
+        # 3. Emotion rules
+        if p.emotion_rules:
+            sections.append(p.emotion_rules.strip())
+
+        # 4. Response format
+        if p.response_format:
+            sections.append(p.response_format.strip())
+
+        # 5. Mode indicator — concise, not verbose
+        if response_mode == "voice":
+            sections.append("ŞU AN SES MODU: Cevabın sesli okunacak. Markdown kullanma, doğal konuş.")
+
+        return "\n\n".join(sections)
 
     def _build_messages(
         self,
         user_message: str,
         image_bytes: bytes | None = None,
+        response_mode: str = "text",
     ) -> list[dict]:
         """
         llama-cpp-python chat completion formatında mesaj listesi oluştur.
@@ -200,24 +263,28 @@ class LlamaCppProvider:
                 {"type": "text", "text": "..."},
                 {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64,..."}}
             ]}
+
+        Args:
+            response_mode: "voice" veya "text" — system prompt'a mod bilgisi aktarır
         """
         messages: list[dict] = []
 
-        # System prompt
-        system_prompt = self._build_system_prompt()
+        # System prompt — response_mode ile mod-aware
+        system_prompt = self._build_system_prompt(response_mode=response_mode)
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
 
-        # Conversation history — image yerine visual memo kullan
-        for msg in self._history.get_context_window():
-            content = msg.content
-            if msg.visual_memo:
-                content = f"[Ekran Notu: {msg.visual_memo}]\n\n{content}"
-            messages.append({"role": msg.role, "content": content})
+        # ── Vision vs Text-only context strategy ──
+        # When image is present, send NO history (stateless vision).
+        # Text-only conversations: Include last N history messages normally.
 
-        # Yeni kullanıcı mesajı
+        # Default prompt for image-only mode (no user text)
+        if not user_message.strip() and image_bytes:
+            user_message = "Ekranımda ne görüyorsun? Detaylı anlat."
+
         if image_bytes and self.has_vision:
-            # Vision format — OpenAI-compatible content list
+            # ── STATELESS VISION MODE ──
+            # System + image + user message only. No history.
             b64 = base64.b64encode(image_bytes).decode("utf-8")
             messages.append({
                 "role": "user",
@@ -232,6 +299,10 @@ class LlamaCppProvider:
                 ],
             })
         else:
+            # ── TEXT-ONLY MODE ──
+            # Include history for conversational continuity
+            for msg in self._history.get_context_window():
+                messages.append({"role": msg.role, "content": msg.content})
             messages.append({"role": "user", "content": user_message})
 
         return messages
@@ -251,6 +322,7 @@ class LlamaCppProvider:
             messages=messages,
             temperature=self._config.temperature,
             max_tokens=self._config.max_tokens,
+            repeat_penalty=self._config.repeat_penalty,
         )
 
     def _sync_chat_stream(
@@ -266,6 +338,7 @@ class LlamaCppProvider:
             messages=messages,
             temperature=self._config.temperature,
             max_tokens=self._config.max_tokens,
+            repeat_penalty=self._config.repeat_penalty,
             stream=True,
         )
 
@@ -275,12 +348,13 @@ class LlamaCppProvider:
         self,
         message: str,
         image_bytes: bytes | None = None,
+        response_mode: str = "text",
     ) -> str:
         """
         Async chat — non-blocking, event loop'u dondurmaz.
         Sync llama-cpp → async bridge (run_in_executor).
         """
-        messages = self._build_messages(message, image_bytes)
+        messages = self._build_messages(message, image_bytes, response_mode)
         _t0 = time.perf_counter()
 
         try:
@@ -303,16 +377,12 @@ class LlamaCppProvider:
                     f"latency: {_elapsed_ms:.0f}ms"
                 )
 
-            # Response extraction
-            assistant_content = response["choices"][0]["message"]["content"]
+            # Response extraction — strip leading whitespace/newlines
+            assistant_content = response["choices"][0]["message"]["content"].strip()
 
-            # History update
-            user_msg = self._history.add_user_message(message)
+            # History update — sadece metin sakla, image yok
+            self._history.add_user_message(message)
             self._history.add_assistant_message(assistant_content)
-
-            # Visual memo arka planda üret
-            if image_bytes and self.has_vision:
-                asyncio.create_task(self._bg_visual_memo(user_msg, image_bytes))
 
             return assistant_content
 
@@ -326,12 +396,13 @@ class LlamaCppProvider:
         self,
         message: str,
         image_bytes: bytes | None = None,
+        response_mode: str = "text",
     ) -> AsyncGenerator[str, None]:
         """
         Async streaming chat — token-by-token yield.
         Sync generator → async bridge (run_in_executor + queue).
         """
-        messages = self._build_messages(message, image_bytes)
+        messages = self._build_messages(message, image_bytes, response_mode)
         _t0 = time.perf_counter()
 
         try:
@@ -355,10 +426,17 @@ class LlamaCppProvider:
             stream_future = loop.run_in_executor(None, _stream_worker)
 
             full_response: list[str] = []
+            _first_token = True
             while True:
                 token = await queue.get()
                 if token is None:
                     break
+                # Strip leading whitespace from first token
+                if _first_token:
+                    token = token.lstrip()
+                    _first_token = False
+                    if not token:
+                        continue
                 full_response.append(token)
                 yield token
 
@@ -370,14 +448,10 @@ class LlamaCppProvider:
             if self._metrics:
                 self._metrics.record_latency("llm_latency_ms", _elapsed_ms)
 
-            # History update
+            # History update — sadece metin sakla, image history'de tutulmaz
             assistant_content = "".join(full_response)
-            user_msg = self._history.add_user_message(message)
+            self._history.add_user_message(message)
             self._history.add_assistant_message(assistant_content)
-
-            # Visual memo arka planda üret
-            if image_bytes and self.has_vision:
-                asyncio.create_task(self._bg_visual_memo(user_msg, image_bytes))
 
         except Exception as e:
             logger.error(f"LLM stream hatası: {e}")
@@ -413,7 +487,7 @@ class LlamaCppProvider:
                 return self._llm.create_chat_completion(
                     messages=messages,
                     temperature=0.3,
-                    max_tokens=512,
+                    max_tokens=1024,
                 )
 
             response = await loop.run_in_executor(None, _sync_memo)

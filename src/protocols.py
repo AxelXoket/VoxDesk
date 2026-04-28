@@ -93,6 +93,7 @@ class LLMProvider(Protocol):
         self,
         message: str,
         image_bytes: bytes | None = None,
+        response_mode: str = "text",
     ) -> str:
         """Async tek-seferlik chat yanıtı."""
         ...
@@ -101,6 +102,7 @@ class LLMProvider(Protocol):
         self,
         message: str,
         image_bytes: bytes | None = None,
+        response_mode: str = "text",
     ) -> AsyncGenerator[str, None]:
         """Async streaming chat — token token yield."""
         ...
@@ -149,4 +151,24 @@ class CaptureBackend(Protocol):
     @property
     def is_running(self) -> bool:
         """Yakalama döngüsü aktif mi?"""
+        ...
+
+
+@runtime_checkable
+class TranslatorEngine(Protocol):
+    """Translation engine contract."""
+
+    def translate(self, text: str, source_lang: str) -> str:
+        """
+        Metni hedef dile çevir.
+        source_lang 'en' ise bypass (identity return).
+        """
+        ...
+
+    def health(self) -> dict:
+        """Engine durum raporu."""
+        ...
+
+    def close(self) -> None:
+        """Kaynakları serbest bırak."""
         ...

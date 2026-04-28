@@ -6,6 +6,7 @@ Yapılandırma, model, kişilik, ses profili yönetimi.
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from fastapi import APIRouter
 from pydantic import BaseModel
 
@@ -44,7 +45,7 @@ async def get_settings():
     """Mevcut ayarları döndür."""
     config = get_config()
     return SettingsResponse(
-        model=config.llm.model_path,
+        model=Path(config.llm.model_path).name if config.llm.model_path else None,
         voice=config.tts.voice,
         tts_speed=config.tts.speed,
         tts_enabled=config.tts.enabled,
@@ -57,6 +58,7 @@ async def get_settings():
             "activate": config.hotkeys.activate,
             "toggle_listen": config.hotkeys.toggle_listen,
             "push_to_talk": config.hotkeys.push_to_talk,
+            "pin_screen": config.hotkeys.pin_screen,
         },
     )
 
@@ -89,21 +91,44 @@ async def list_models():
     config = get_config()
     models = []
     if config.llm.model_path:
-        models.append({"name": config.llm.model_path, "role": "primary"})
+        models.append({"name": Path(config.llm.model_path).name, "role": "primary"})
     if config.llm.fallback_model_path:
-        models.append({"name": config.llm.fallback_model_path, "role": "fallback"})
+        models.append({"name": Path(config.llm.fallback_model_path).name, "role": "fallback"})
     return {"models": models, "llm_available": state.llm is not None}
 
 
 @router.put("/model")
 async def update_model(request: ModelUpdateRequest):
-    """Aktif modeli değiştir."""
+    """Aktif modeli değiştir. (NOT: hot-swap henüz implement değil — stub)."""
     from src.main import get_app_state
     state = get_app_state()
     if state.llm is None:
         return {"status": "error", "message": "LLM unavailable — model file missing"}
     state.llm.set_model(request.model)
     return {"status": "ok", "model": request.model}
+
+
+@router.put("/tts/toggle")
+async def toggle_tts():
+    """TTS'i aç/kapat (runtime toggle)."""
+    from src.main import get_app_state
+    state = get_app_state()
+    if state.tts is None:
+        return {"status": "error", "message": "TTS component unavailable"}
+    state.tts.enabled = not state.tts.enabled
+    logger.info(f"TTS toggled: {state.tts.enabled}")
+    return {"status": "ok", "tts_enabled": state.tts.enabled}
+
+
+@router.put("/voice-activation/toggle")
+async def toggle_voice_activation():
+    """Voice activation'ı aç/kapat (runtime toggle)."""
+    config = get_config()
+    current = config.voice_activation.enabled
+    object.__setattr__(config.voice_activation, "enabled", not current)
+    new_state = config.voice_activation.enabled
+    logger.info(f"Voice activation toggled: {new_state}")
+    return {"status": "ok", "voice_activation_enabled": new_state}
 
 
 @router.get("/personalities")
@@ -137,6 +162,9 @@ async def set_personality(name: str):
             state.llm.set_personality(personality)
         if state.tts and personality.voice:
             state.tts.set_voice(personality.voice)
+        # Sprint 5.1: STT domain vocabulary — personality'ye bağlı
+        if state.stt and hasattr(state.stt, 'set_initial_prompt'):
+            state.stt.set_initial_prompt(personality.stt_context)
         return {"status": "ok", "personality": personality.name}
     except FileNotFoundError:
         return {"status": "error", "message": f"Kişilik bulunamadı: {name}"}

@@ -66,19 +66,47 @@ async def ws_chat(websocket: WebSocket):
     from src.main import get_app_state
 
     state = get_app_state()
-    await state.ws_manager.connect(websocket, "chat")
+    connected = await state.ws_manager.connect(websocket, "chat")
+    if not connected:
+        return
 
     try:
         while True:
             data = await websocket.receive_json()
             message = data.get("message", "")
             include_screen = data.get("include_screen", True)
+            attachments = data.get("attachments", [])
 
+            # ── Image priority: attachment > pinned frame > always-on screen ──
             image_bytes = None
-            if include_screen and state.capture:
-                frame = state.capture.get_latest_frame()
+
+            # 1. User attachment (file upload, drag & drop, paste)
+            if attachments:
+                try:
+                    first_attachment = attachments[0]
+                    att_data = first_attachment.get("data", "")
+                    # Strip data URI prefix if present (e.g., "data:image/jpeg;base64,...")
+                    if "," in att_data:
+                        att_data = att_data.split(",", 1)[1]
+                    image_bytes = base64.b64decode(att_data)
+                    logger.info(f"📎 User attachment received ({len(image_bytes)} bytes)")
+                except Exception as att_err:
+                    logger.error(f"Attachment decode error: {att_err}")
+
+            # 2. Pinned frame (hotkey capture — sekme değişmeden önce alınmış)
+            if image_bytes is None and state.capture and state.capture.has_pin:
+                frame = state.capture.get_pinned_frame()
                 if frame:
                     image_bytes = frame.image_bytes
+                    state.capture.clear_pin()
+                    logger.info("📌 Using pinned frame")
+
+            # 3. Always-on screen capture — anlık canlı frame (stale buffer değil)
+            if image_bytes is None and include_screen and state.capture:
+                frame = state.capture.grab_now()
+                if frame:
+                    image_bytes = frame.image_bytes
+                    logger.info(f"📸 Live frame captured ({frame.width}x{frame.height})")
 
             if state.llm is None:
                 await state.ws_manager.send_json(websocket, {
@@ -131,7 +159,9 @@ async def ws_screen(websocket: WebSocket):
     from src.main import get_app_state
 
     state = get_app_state()
-    await state.ws_manager.connect(websocket, "screen")
+    connected = await state.ws_manager.connect(websocket, "screen")
+    if not connected:
+        return
 
     _last_frame_ts = 0.0
 
@@ -175,7 +205,9 @@ async def ws_voice(websocket: WebSocket):
     from src.main import get_app_state
 
     state = get_app_state()
-    await state.ws_manager.connect(websocket, "voice")
+    connected = await state.ws_manager.connect(websocket, "voice")
+    if not connected:
+        return
 
     loop = asyncio.get_running_loop()
 
@@ -187,7 +219,16 @@ async def ws_voice(websocket: WebSocket):
             if msg_type == "audio":
                 audio_b64 = data.get("audio", "")
                 audio_format = data.get("format", "webm")  # "webm" veya "pcm"
-                audio_bytes = base64.b64decode(audio_b64)
+                try:
+                    audio_bytes = base64.b64decode(audio_b64)
+                except Exception:
+                    await state.ws_manager.send_json(websocket, {
+                        "type": "voice_error",
+                        "code": "INVALID_AUDIO",
+                        "message": "Base64 audio decode failed.",
+                        "recoverable": True,
+                    })
+                    continue
 
                 # 1. Audio decode (blocking → executor)
                 if audio_format == "pcm":
@@ -222,12 +263,16 @@ async def ws_voice(websocket: WebSocket):
                     "language": lang,
                 })
 
-                # 3. LLM — async, non-blocking
-                image_bytes = None
+                # Voice mode: LLM handles multilingual natively, no translator needed
+                llm_input = text
+
+                # 3. Screen capture — voice mode'da da ekranı gör
+                voice_image_bytes = None
                 if state.capture:
-                    frame = state.capture.get_latest_frame()
+                    frame = state.capture.grab_now()
                     if frame:
-                        image_bytes = frame.image_bytes
+                        voice_image_bytes = frame.image_bytes
+                        logger.info(f"🎤📸 Voice: live frame captured ({frame.width}x{frame.height})")
 
                 if state.llm is None:
                     await state.ws_manager.send_json(websocket, {
@@ -238,7 +283,7 @@ async def ws_voice(websocket: WebSocket):
                     })
                     continue
 
-                llm_response = await state.llm.chat(text, image_bytes)
+                llm_response = await state.llm.chat(llm_input, image_bytes=voice_image_bytes, response_mode="voice")
 
                 await state.ws_manager.send_json(websocket, {
                     "type": "llm_response",
@@ -247,27 +292,40 @@ async def ws_voice(websocket: WebSocket):
 
                 # 4. TTS — streaming, executor'da çalışır (blocking)
                 if state.tts and state.tts.enabled:
-                    import soundfile as sf
+                    try:
+                        import soundfile as sf
 
-                    def _produce_tts_chunks():
-                        """TTS chunk'ları üret (senkron, executor'da çalışır)."""
-                        chunks = []
-                        for chunk in state.tts.synthesize_stream(llm_response):
-                            buf = io.BytesIO()
-                            sf.write(buf, chunk, state.tts.sample_rate, format="WAV")
-                            chunks.append(base64.b64encode(buf.getvalue()).decode())
-                        return chunks
+                        def _produce_tts_chunks():
+                            """TTS chunk'ları üret (senkron, executor'da çalışır)."""
+                            chunks = []
+                            for chunk in state.tts.synthesize_stream(llm_response):
+                                buf = io.BytesIO()
+                                sf.write(buf, chunk, state.tts.sample_rate, format="WAV")
+                                chunks.append(base64.b64encode(buf.getvalue()).decode())
+                            return chunks
 
-                    tts_chunks = await loop.run_in_executor(None, _produce_tts_chunks)
-                    for chunk_b64 in tts_chunks:
+                        tts_chunks = await loop.run_in_executor(None, _produce_tts_chunks)
+                        for chunk_b64 in tts_chunks:
+                            await state.ws_manager.send_json(websocket, {
+                                "type": "tts_audio",
+                                "audio": chunk_b64,
+                            })
+                    except Exception as tts_err:
+                        logger.error(f"Voice TTS hatası: {tts_err}")
+                        state.record_error(f"Voice TTS: {tts_err}")
+                        if state.metrics:
+                            state.metrics.increment("tts_errors_total")
                         await state.ws_manager.send_json(websocket, {
-                            "type": "tts_audio",
-                            "audio": chunk_b64,
+                            "type": "voice_error",
+                            "code": "TTS_FAILED",
+                            "message": f"TTS synthesis failed: {tts_err}",
+                            "recoverable": True,
                         })
 
     except WebSocketDisconnect:
-        state.ws_manager.disconnect(websocket, "voice")
+        pass
     except Exception as e:
         logger.error(f"WS voice hatası: {e}")
         state.record_error(f"Voice WS: {e}")
+    finally:
         state.ws_manager.disconnect(websocket, "voice")

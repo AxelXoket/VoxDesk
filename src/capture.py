@@ -1,4 +1,4 @@
-﻿"""
+"""
 VoxDesk — Screen Capture Module
 dxcam ile yüksek performanslı ekran yakalama.
 Ring buffer ile son N frame bellekte tutulur.
@@ -51,6 +51,9 @@ class ScreenCapture:
         self._running = False
         self._thread: threading.Thread | None = None
         self._lock = threading.Lock()
+        # Pin mechanism — hotkey ile yakalanan frame
+        self._pinned_frame: CapturedFrame | None = None
+        self._pin_lock = threading.Lock()
 
     def _init_camera(self):
         """dxcam kamerasını başlat."""
@@ -72,8 +75,8 @@ class ScreenCapture:
             # NumPy array -> PIL Image
             img = Image.fromarray(frame)
 
-            # Resize (LLM için optimize)
-            if img.width > self.resize_width:
+            # Resize (LLM için optimize) — 0 = no resize
+            if self.resize_width > 0 and img.width > self.resize_width:
                 ratio = self.resize_width / img.width
                 new_height = int(img.height * ratio)
                 img = img.resize((self.resize_width, new_height), Image.LANCZOS)
@@ -123,7 +126,13 @@ class ScreenCapture:
         if self._thread:
             self._thread.join(timeout=5)
         if self._camera:
-            del self._camera
+            try:
+                if hasattr(self._camera, 'release'):
+                    self._camera.release()
+                else:
+                    del self._camera
+            except Exception as e:
+                logger.warning(f"Camera release hatası: {e}")
             self._camera = None
         logger.info("🔴 Screen capture durduruldu")
 
@@ -139,10 +148,80 @@ class ScreenCapture:
             return frames[-count:] if len(frames) >= count else frames
 
     def grab_now(self) -> CapturedFrame | None:
-        """Anlık frame yakala (buffer'dan değil, canlı)."""
-        if not self._camera:
-            self._init_camera()
-        return self._capture_frame()
+        """
+        Anlık frame yakala — CPU tabanlı (PIL ImageGrab).
+        dxcam GPU kullanır ve model inference sırasında başarısız olabilir.
+        Bu method GPU'dan bağımsız çalışır, her zaman taze frame döndürür.
+        """
+        try:
+            from PIL import ImageGrab
+            img = ImageGrab.grab()
+
+            # Resize (LLM için optimize) — 0 = no resize
+            if self.resize_width > 0 and img.width > self.resize_width:
+                ratio = self.resize_width / img.width
+                new_height = int(img.height * ratio)
+                img = img.resize((self.resize_width, new_height), Image.LANCZOS)
+
+            # JPEG sıkıştırma -> bytes
+            buffer = io.BytesIO()
+            img.save(buffer, format="JPEG", quality=self.jpeg_quality)
+            jpeg_bytes = buffer.getvalue()
+
+            return CapturedFrame(
+                image_bytes=jpeg_bytes,
+                timestamp=time.time(),
+                width=img.width,
+                height=img.height,
+            )
+        except Exception as e:
+            logger.error(f"CPU grab failed: {e}")
+            # Fallback to ring buffer
+            return self.get_latest_frame()
+
+    # ── Pin Mechanism ─────────────────────────────────────────
+    # Hotkey ile mevcut frame'i "pinle" — sekme değişince kaybolmasın
+
+    def pin_current_frame(self) -> CapturedFrame | None:
+        """
+        Mevcut ekranı anlık yakala ve pinle.
+        Hotkey callback'inden çağrılır.
+        Returns: Pinlenen frame, veya None (capture başarısızsa)
+        """
+        frame = self.grab_now()
+        if frame:
+            with self._pin_lock:
+                self._pinned_frame = frame
+            logger.info(f"📌 Ekran pinlendi ({frame.width}x{frame.height})")
+        return frame
+
+    def get_pinned_frame(self) -> CapturedFrame | None:
+        """Pinlenmiş frame'i döndür (varsa)."""
+        with self._pin_lock:
+            return self._pinned_frame
+
+    def clear_pin(self) -> None:
+        """Pin'i temizle (kullanıldıktan sonra çağrılır)."""
+        with self._pin_lock:
+            self._pinned_frame = None
+        logger.debug("📌 Pin temizlendi")
+
+    def get_best_frame(self) -> CapturedFrame | None:
+        """
+        Mesaj gönderiminde en iyi frame'i seç.
+        Öncelik: pinned > latest from ring buffer
+        Pin varsa kullanır ve temizler.
+        """
+        pinned = self.get_pinned_frame()
+        if pinned:
+            self.clear_pin()
+            return pinned
+        return self.get_latest_frame()
+
+    @property
+    def has_pin(self) -> bool:
+        with self._pin_lock:
+            return self._pinned_frame is not None
 
     @property
     def is_running(self) -> bool:
@@ -152,3 +231,32 @@ class ScreenCapture:
     def buffer_count(self) -> int:
         with self._lock:
             return len(self._buffer)
+
+    # ── Protocol Compliance ───────────────────────────────────
+
+    def health(self) -> dict:
+        """Capture subsystem health report."""
+        with self._lock:
+            buf_count = len(self._buffer)
+        return {
+            "running": self._running,
+            "buffer_count": buf_count,
+            "buffer_size": self.buffer_size,
+            "interval": self.interval,
+            "has_camera": self._camera is not None,
+            "has_pin": self.has_pin,
+        }
+
+    def close(self) -> None:
+        """
+        Full cleanup — stop capture, release camera, clear buffers.
+        Safe to call multiple times.
+        """
+        self.stop()
+        # Clear buffers
+        with self._lock:
+            self._buffer.clear()
+        # Clear pin
+        with self._pin_lock:
+            self._pinned_frame = None
+        logger.info("🔴 Screen capture closed & buffers cleared")
