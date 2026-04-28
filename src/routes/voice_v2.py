@@ -6,9 +6,9 @@ Receive loop:
     1. Text frame → JSON dispatch (audio_config, audio_end, audio_cancel)
     2. Binary frame → PCM decode (only after handshake)
 
-Screen capture always-on:
-    Her voice istek ekranı dahil eder. VoxDesk desktop assistant'tır —
-    sesin bağlamı ekrandır. Bu bilinçli bir tasarım kararıdır.
+Voice mode — text-only:
+    Sesli girdi sadece metin olarak LLM'e gönderilir.
+    Ekran analizi sadece chat (text) pipeline'da kullanılır.
 
 Güvenlik:
     - Binary before handshake → protocol_error
@@ -60,7 +60,9 @@ async def ws_voice_v2(websocket: WebSocket):
     from src.main import get_app_state
 
     state = get_app_state()
-    await state.ws_manager.connect(websocket, "voice_v2")
+    connected = await state.ws_manager.connect(websocket, "voice_v2")
+    if not connected:
+        return
 
     session = AudioSession()
     audio_buffer = bytearray()
@@ -248,17 +250,15 @@ async def _process_audio_buffer(
         "language": lang,
     })
 
-    # LLM — async, non-blocking
-    image_bytes = None
-    if state.capture:
-        frame = state.capture.get_latest_frame()
-        if frame:
-            image_bytes = frame.image_bytes
+    # Voice mode: LLM algılar dili, çeviri yapılmaz.
+    llm_input = text
 
+    # LLM — async, non-blocking
+    # Voice mode = text-only (ekran analizi sadece chat pipeline'da)
     try:
         if state.llm is None:
             raise RuntimeError("LLM unavailable — local model file missing")
-        llm_response = await state.llm.chat(text, image_bytes)
+        llm_response = await state.llm.chat(llm_input, image_bytes=None, response_mode="voice")
     except Exception as llm_err:
         logger.error(f"Voice LLM error: {llm_err}")
         state.metrics.increment("llm_errors_total")
@@ -367,6 +367,7 @@ async def _handle_legacy_audio(
         None, state.stt.transcribe_audio, audio_array
     )
     text = result.get("text", "")
+    lang = result.get("language", "unknown")
 
     if not text.strip():
         await websocket.send_json({"type": "stt_empty"})
@@ -375,20 +376,17 @@ async def _handle_legacy_audio(
     await websocket.send_json({
         "type": "stt_result",
         "text": text,
-        "language": result.get("language", "unknown"),
+        "language": lang,
     })
 
-    # LLM
-    image_bytes = None
-    if state.capture:
-        frame = state.capture.get_latest_frame()
-        if frame:
-            image_bytes = frame.image_bytes
+    # Voice mode: çeviri yok, LLM orijinal dilde cevaplar
+    llm_input = text
 
+    # LLM — voice mode = text-only (no screen capture)
     try:
         if state.llm is None:
             raise RuntimeError("LLM unavailable — local model file missing")
-        llm_response = await state.llm.chat(text, image_bytes)
+        llm_response = await state.llm.chat(llm_input, image_bytes=None, response_mode="voice")
     except Exception as llm_err:
         logger.error(f"Voice legacy LLM error: {llm_err}")
         state.record_error(f"Voice legacy LLM: {llm_err}")

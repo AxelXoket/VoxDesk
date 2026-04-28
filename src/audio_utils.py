@@ -65,10 +65,13 @@ def decode_audio_webm(audio_bytes: bytes) -> "np.ndarray | None":
 
 def decode_audio_raw_pcm(audio_bytes: bytes) -> "np.ndarray | None":
     """
-    Doğrudan PCM float32 data (AudioWorklet'ten geliyorsa).
+    Raw PCM S16LE data → float32 numpy array.
+    AudioWorklet (audio-processor.js) Int16 PCM gönderir.
+    int16 → float32 normalize (-1.0 ~ 1.0) yapılır.
     """
     import numpy as np
     try:
-        return np.frombuffer(audio_bytes, dtype=np.float32)
+        pcm_int16 = np.frombuffer(audio_bytes, dtype=np.int16)
+        return pcm_int16.astype(np.float32) / 32768.0
     except Exception:
         return None

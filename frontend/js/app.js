@@ -46,20 +46,19 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Mic button — Push-to-talk via AudioCapture
+    // Mic button — Click toggle recording (click to start, click to stop)
     const micBtn = document.getElementById('btnMic');
     let audioCapture = null;
+    let silenceTimer = null;
 
-    micBtn.addEventListener('mousedown', async () => {
-        if (audioCapture && audioCapture.isRecording) return;
-
+    async function startRecording() {
         // Ensure voice WS is connected
         if (!window.voxWs.isVoiceConnected()) {
             window.voxWs.connectVoice();
-            // Wait briefly for connection
             await new Promise(r => setTimeout(r, 500));
             if (!window.voxWs.isVoiceConnected()) {
                 console.error('[App] Voice WS not connected');
+                window.VoxChat.addMessage('assistant', '⚠️ Ses bağlantısı kurulamadı. Tekrar deneyin.');
                 return;
             }
         }
@@ -67,28 +66,46 @@ document.addEventListener('DOMContentLoaded', () => {
         micBtn.classList.add('recording');
 
         try {
-            // Sprint 3.5: Transport adapter instead of raw WebSocket
             const transport = {
                 sendControl: (payload) => window.voxWs.sendVoiceControl(payload),
                 sendBinary: (buffer) => window.voxWs.sendVoiceBinary(buffer),
                 isOpen: () => window.voxWs.isVoiceConnected(),
             };
-            // Sprint 3.5: Pass feature flags to AudioCapture
-            const useBinary = _cachedFeatures?.enable_binary_audio !== false;
+            const useBinary = _cachedFeatures != null
+                ? _cachedFeatures.enable_binary_audio !== false
+                : true;  // Default to binary if features not yet loaded
             audioCapture = new AudioCapture(transport, { useBinary });
             await audioCapture.start();
+
+            // 5-second silence warning — only if mic failed silently
+            silenceTimer = setTimeout(() => {
+                if (audioCapture && audioCapture.isRecording && !audioCapture._mode) {
+                    window.VoxChat.addMessage('assistant', '⚠️ Mikrofon başlatılamadı. Tarayıcı izinlerini kontrol edin.');
+                }
+            }, 5000);
+
         } catch (e) {
             console.error('Mikrofon hatası:', e);
+            window.VoxChat.addMessage('assistant', `⚠️ Mikrofon erişimi reddedildi: ${e.message}`);
             micBtn.classList.remove('recording');
             audioCapture = null;
         }
-    });
+    }
 
-    micBtn.addEventListener('mouseup', () => {
+    function stopRecording() {
+        if (silenceTimer) { clearTimeout(silenceTimer); silenceTimer = null; }
         if (audioCapture && audioCapture.isRecording) {
             audioCapture.stop();
         }
         micBtn.classList.remove('recording');
+    }
+
+    micBtn.addEventListener('click', async () => {
+        if (audioCapture && audioCapture.isRecording) {
+            stopRecording();
+        } else {
+            await startRecording();
+        }
     });
 
     // Voice WS events — TTS audio queue (chunk'lar sıralı çalınır)
@@ -109,14 +126,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (data.type === 'stt_result') {
-            window.VoxChat.addMessage('user', `🎤 ${data.text}`);
+            window.VoxChat.addMessage('user', data.text);
         } else if (data.type === 'llm_response') {
             window.VoxChat.addMessage('assistant', data.text);
         } else if (data.type === 'tts_audio') {
             ttsQueue.push(data.audio);
             if (!ttsPlaying) playNextTTS();
         } else if (data.type === 'voice_error') {
-            // Sprint 2: Show voice errors as assistant messages
             window.VoxChat.addMessage('assistant', `⚠️ ${data.message || 'Voice error occurred'}`);
         }
     });
@@ -124,6 +140,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Sprint 3.5: Voice close/error cleanup — stop AudioCapture safely
     function _cleanupVoiceCapture(reason) {
         console.log(`[App] Voice cleanup: ${reason}`);
+        if (silenceTimer) { clearTimeout(silenceTimer); silenceTimer = null; }
         if (audioCapture && audioCapture.isRecording) {
             audioCapture.stop();
         }
@@ -201,7 +218,11 @@ function playAudio(base64Audio, onEnded) {
         const blob = new Blob([arrayBuf], { type: 'audio/wav' });
         const url = URL.createObjectURL(blob);
         const audio = new Audio(url);
-        audio.play();
+        audio.play().catch(err => {
+            console.warn('Audio autoplay blocked:', err);
+            URL.revokeObjectURL(url);
+            if (onEnded) onEnded();
+        });
         audio.onended = () => {
             URL.revokeObjectURL(url);
             if (onEnded) onEnded();

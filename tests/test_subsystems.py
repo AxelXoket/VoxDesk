@@ -348,16 +348,15 @@ class TestIsolation:
         report = verify_isolation()
         assert isinstance(report, dict)
         assert "env_guards_set" in report
-        assert "internet_blocked" in report
         assert "status" in report
         assert report["env_guards_set"] is True
         assert report["status"] in ("OK", "WARNING")
 
     def test_verify_isolation_required_keys(self):
-        """Rapor tam 3 anahtar içermeli."""
+        """Rapor tam 2 anahtar içermeli."""
         from src.isolation import verify_isolation
         report = verify_isolation()
-        assert set(report.keys()) == {"env_guards_set", "internet_blocked", "status"}
+        assert set(report.keys()) == {"env_guards_set", "status"}
 
 
 # ══════════════════════════════════════════════════════════════

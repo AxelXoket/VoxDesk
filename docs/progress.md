@@ -339,3 +339,296 @@ First-ever local LLM inference on VoxDesk — no Ollama, no cloud, pure llama-cp
 - 3D-Resampler vision testi (single image → multi-image → 6-frame temporal)
 - Abliterated model indirme (kullanıcı onayı ile)
 - End-to-end pipeline: STT → LLM (with screen) → TTS
+
+---
+
+## 2026-04-27 (Sunday) — 20:30 — Sprint 4.2+4.3: STT/TTS Pipeline + Translator
+
+### Voice Pipeline Integration ✅
+
+**Baseline:** 390 tests → 390 tests (zero regression) · Regression: 59 (preserved)
+
+End-to-end voice pipeline: Mic → STT → Translator → LLM → TTS → Speaker.
+
+**What was done:**
+
+**System Dependencies:**
+- Installed espeak-ng 1.52.0 (Windows MSI) — required by Kokoro TTS phoneme engine
+- Set `PHONEMIZER_ESPEAK_LIBRARY` environment variable
+
+**Translator Module (`src/translator.py`):**
+- New module: MarianMT (`Helsinki-NLP/opus-mt-tr-en`) via PyTorch float16 GPU inference
+- VRAM footprint: ~146 MB (measured on RTX 5080)
+- Inference latency: 40-57ms (warmup sonrası)
+- ManagedModel lifecycle integration (same pattern as STT/TTS)
+- Language-aware bypass: `source_lang == "en"` → identity return (no translation)
+- Downloaded model to `models/opus-mt-tr-en/` (local-first, no hub runtime access)
+- Dependencies: `transformers`, `sentencepiece`, `sacremoses`
+
+**Translation Quality Verified:**
+| Input (TR) | Output (EN) | Latency |
+|:---|:---|:---|
+| Ekranımda ne var söyler misin? | Can you tell me what's on my screen? | 57ms |
+| Bu dosyayı nasıl açarım? | How do I open this file? | 44ms |
+| Lütfen bu hatayı çözmeme yardım et. | Please help me solve this mistake. | 40ms |
+| Şu anda çalışan uygulamalar neler? | What are the applications that are currently running? | 51ms |
+
+**Config Updates:**
+- Added `TranslatorConfig` to `src/config.py` with `extra='forbid'`
+- Added `model_path` field to `STTConfig` for local CTranslate2 path
+- Added `translator:` section to `config/default.yaml`
+- Added `translator_idle_unload_seconds: 180.0` to VRAMConfig
+- Updated idle unload timers: 120s → 180s (3 minutes) for STT/TTS/Translator
+- Enabled `enable_vram_unload: true` in features
+
+**Pipeline Integration:**
+- `voice_v2.py` binary pipeline: STT → Translator(TR→EN) → LLM → TTS
+- `voice_v2.py` legacy pipeline: same translator step added
+- New WebSocket event: `stt_translated` (original + translated + source_lang)
+- Translator registered in ModuleRegistry as `("translator", "marian")`
+- Translator registered in VRAM Manager for idle unload
+- Translator added to AppState + startup (degraded mode) + shutdown cleanup
+
+**VRAM Budget (Measured):**
+| Model | VRAM | Idle Unload |
+|:---|:---|:---|
+| MiniCPM-V 4.5 Q6_K | ~7 GB | ❌ Always warm |
+| faster-whisper large-v3-turbo | ~3 GB | ✅ 3 min |
+| Kokoro TTS | ~2 GB | ✅ 3 min |
+| MarianMT opus-mt-tr-en (float16) | ~146 MB | ✅ 3 min |
+| **Active total** | **~12.1 GB** | 76% of 16 GB |
+| **Idle total** | **~7 GB** | 44% — LLM only |
+
+**Verification:**
+- 390 tests passing, 1 skipped ✅
+- Zero regressions
+- MarianMT smoke test: 4 TR→EN translations verified
+- espeak-ng installed and accessible
+- All documentation updated
+
+---
+
+## 2026-04-27 (Sunday) — Sprint 4.3: Full Repository Audit
+
+### Sprint 4.3: Full Repo Audit ✅
+
+**Baseline:** 390 → 404 tests
+
+**Audit Findings (10 total, 7 critical):**
+1. ✅ VRAMManager per-model timeout (fixed in 4.2)
+2. ✅ `/api/status` translator (fixed in 4.2)
+3. ✅ Test coverage for translator (fixed in 4.2)
+4. ✅ `local_files_only=True` enforcement (fixed in 4.2)
+5. ✅ STT model_path bug (fixed in 4.2)
+6. 🔴 Legacy `/ws/voice` (chat.py) missing translator → **fixed**
+7. 🟡 Frontend `stt_translated` handler missing → deferred to Sprint 5.1
+8. 🔴 Factory lifecycle params not wired from VRAMConfig → **fixed**
+9. 🟡 TranslatorEngine protocol missing → **added**
+10. 🟡 `enable_vram_unload` default mismatch → **fixed** (False → True)
+
+**Verification:**
+- 404 tests passing, 1 skipped ✅
+- Zero regressions
+
+---
+
+## 2026-04-27 (Sunday) — Sprint 5.0: System Prompt Architecture
+
+### Sprint 5.0: Modular Prompt System ✅
+
+**Baseline:** 404 → 421 tests
+
+**What was done:**
+
+**PersonalityConfig Expansion:**
+- Added 4 new modular prompt fields:
+  - `stt_context` — Whisper initial_prompt (domain vocabulary)
+  - `screen_analysis_prompt` — Ekran yorumlama talimatları
+  - `emotion_rules` — Duygu algılama/yansıtma filtresi
+  - `response_format` — Voice/text çıktı biçim kuralları
+
+**Voxly Prompt (Comprehensive):**
+- Core identity: professional, warm, context-aware desktop assistant
+- Screen analysis: code editors, terminals, browsers, video, games, photos, design tools, chat apps
+- Emotion rules: personality-as-filter — context → personality lens → response
+- Response format: voice = natural conversational language, text = markdown
+- Context-driven response depth: never artificially short/long, let context guide
+
+**LLM Prompt Composer:**
+- `_build_system_prompt(response_mode)` assembles all prompt sections
+- Empty sections skipped — simple personalities work with just system_prompt
+- Voice mode appends `CURRENT MODE: Voice output` indicator
+- `response_mode` flows: chat()/chat_stream() → _build_messages() → _build_system_prompt()
+
+**STT Initial Prompt:**
+- `SpeechRecognizer.initial_prompt` parameter added
+- Wired from `personality.stt_context` through factory
+- Domain vocabulary (Python, FastAPI, VoxDesk, Turkish words) improves transcription accuracy
+
+**Voice Pipeline Wiring:**
+- All voice endpoints (voice_v2 binary, voice_v2 legacy, chat.py legacy) pass `response_mode="voice"`
+- Text chat endpoints use default `response_mode="text"`
+
+**Test Coverage:**
+- 17 new tests in `test_sprint5_prompts.py`
+- PersonalityConfig new fields + extra='forbid'
+- Voxly YAML loads all sections + key concepts present
+- Prompt composer: all sections, skip empty, voice/text mode
+- STT initial_prompt wiring
+- Regression guards: field list, API signatures
+
+**Verification:**
+- 421 tests passing, 1 skipped ✅
+- Zero regressions
+
+---
+
+## 2026-04-27 (Sunday) — Sprint 5.0 Audit: Exhaustive Fix
+
+### Sprint 5.0 Audit — 72 Dosya, 14 Bulgu, 7 Düzeltme ✅
+
+**Baseline:** 421 → 444 tests
+
+**Düzeltilen Bulgular:**
+
+| # | Seviye | Bulgu | Düzeltme |
+|:--|:-------|:------|:---------|
+| 1 | 🔴 | LLMProvider protocol `response_mode` eksik | `protocols.py` — chat/chat_stream'e `response_mode` eklendi |
+| 2 | 🔴 | Debug metrics translator eksik | `main.py` — engines dict'e translator eklendi |
+| 3 | 🔴 | pyproject.toml translator deps eksik | `pyproject.toml` — transformers/sentencepiece/sacremoses eklendi |
+| 4 | 🔴 | STT `local_files_only` eksik | `stt.py` — WhisperModel'e `local_files_only=True` eklendi |
+| 7 | 🟡 | VISUAL_MEMO_PROMPT Türkçe | `types.py` — İngilizce'ye çevrildi |
+| 9 | 🟡 | opencv-python-headless gereksiz | `requirements.txt` — kaldırıldı |
+| 10 | 🟡 | Version 0.2.0 eski | `pyproject.toml` — 0.5.0'a yükseltildi |
+
+**Ertelenen Bulgular (Sprint 5.1):**
+- #5: Personality değişiminde STT initial_prompt güncellenmesi
+- #6: Frontend `stt_translated` handler
+- #8: `PUT /personality/{name}` route STT güncellenmesi
+
+**Yeni Test Dosyaları:**
+- `test_audit_regression.py` — 19 test (audit bulgu doğrulama)
+- `test_protocols.py` — +4 test (TranslatorEngine + response_mode)
+
+**Verification:**
+- 444 tests passing, 1 skipped ✅
+- Zero regressions
+
+---
+
+## 2026-04-27 (Sunday) — Sprint 5.1: Final Wiring + Model Download
+
+### Sprint 5.1: Personality→STT Wiring + Whisper Model ✅
+
+**Baseline:** 444 → 453 tests
+
+**Model Download:**
+- `deepdml/faster-whisper-large-v3-turbo-ct2` → `models/whisper-large-v3-turbo/` (1.5 GB CTranslate2 FP16)
+- `config/default.yaml` → `stt.model_path` set edildi
+
+**Personality Swap → STT Context (#5, #8):**
+- `SpeechRecognizer.set_initial_prompt()` — runtime vocabulary güncelleme
+- `PUT /personality/{name}` → `state.stt.set_initial_prompt(personality.stt_context)` eklendi
+
+**Frontend stt_translated (#6):**
+- `app.js` → `stt_translated` event handler eklendi
+- 5 voice event tam kapsam: stt_result, stt_translated, llm_response, tts_audio, voice_error
+
+**Verification:**
+- 453 tests passing, 1 skipped ✅
+- Sprint 5 tamamlandı ✅
+
+---
+
+## 2026-04-28 (Monday) — Sprint 5.2: Audit Triage + Modality Matrix
+
+### Sprint 5.2: 100-Bug Triage + Security Hardening ✅
+
+**Baseline:** 453 → 474 tests
+
+**Audit Triage:**
+- 100 bug triage (3 audit raporu birleştirildi)
+- 38 active → 21 resolved, 7 kalan, 50 obsolete, 10 docs-only
+- Deduplicated 38 → 26 unique active bug
+
+**P1 — Security/Privacy/Runtime:**
+- Path leak kapatıldı (`/api/settings`, `/api/models` → basename only)
+- Empty origin `""` → reject (BUG-013/074)
+- Google DNS TCP testi kaldırıldı — privacy (BUG-084)
+- Base64 decode try/except (BUG-032)
+- PCM float32→int16 decode fix (BUG-069)
+- pyproject.toml try/except guard (BUG-015/077)
+
+**P2 — Voice Pipeline:**
+- Legacy `response_mode="voice"` fix (BUG-001)
+- `/ws/voice` finally bloğu (BUG-002)
+- History O(n²)→O(n) trim + visual_memo (BUG-094)
+
+**P3 — Frontend:**
+- XSS onclick→addEventListener (BUG-018/066)
+- Send button disabled during streaming (BUG-058/090)
+- btoa→arrayBufferToBase64 (BUG-020/082)
+- _cachedFeatures null guard (BUG-019/055)
+- audio.play().catch() (BUG-076)
+- ttsToggle/vaToggle backend wiring (BUG-067)
+
+**P4 — Infrastructure:**
+- All 4 WS handlers check connect() return (BUG-009/010)
+- PUT /model documented as stub (BUG-048)
+- TTS/VA toggle backend endpoints added
+
+**Modality Matrix:**
+- 8 interaction mode tanımlandı (Mode ≠ Handler)
+- InteractionOrchestrator design documented
+
+**Verification:**
+- 474 tests passing, 9 pre-existing failed, 0 regressions ✅
+- `test_sprint52_fixes.py` — 30 targeted regression tests
+
+---
+
+## 2026-04-28 (Monday) — Sprint 5.3: Final Runtime Fixes
+
+### Sprint 5.3: Voice+Screen Completion + Race Condition + Infrastructure ✅
+
+**Baseline:** 474 → 484 tests
+
+**P1 — Voice+Screen TTS Exception:**
+- TTS section now wrapped in try/except
+- Structured error: `code: TTS_FAILED`, `recoverable: true`
+- `record_error()` + `tts_errors_total` metric
+- Voice+Screen artık "kısmi" değil, kontrollü hata yönetimine sahip
+
+**P2 — Model Load Race Condition:**
+- `threading.Event` (_load_event) eklendi
+- İkinci caller mevcut load'un bitmesini bekler (max 120s)
+- Load sahipliği flag-based (should_load/should_wait)
+- **Deadlock düzeltildi:** `_do_load()` lock dışına çıkarıldı
+- Concurrent load test eklendi
+
+**P3 — SecurityConfig Enforcement:**
+- `audio_protocol.py` frame limitleri config-backed (`get_max_frame_bytes()`)
+- `SecurityConfig.max_ws_frame_bytes` artık runtime'da enforced
+
+**P4 — ScreenCapture Protocol:**
+- `health()` → running, buffer_count, has_camera, has_pin raporu
+- `close()` → stop + buffer clear + pin clear
+- `stop()` → dxcam `camera.release()` (proper API)
+
+**P5 — VRAM Async Safety:**
+- `safe_unload()` → `loop.run_in_executor()` ile çağrılıyor
+- Event loop block riski ortadan kalktı
+
+**P6 — PTT Release Modifier:**
+- Her modifier key'e `on_release_key` handler eklendi
+- Ctrl bırakıldığında da PTT kapanıyor
+
+**P7 — Tray Quit Wiring:**
+- `on_quit=_tray_quit` callback set edildi
+- `SIGINT` sinyali ile uvicorn graceful shutdown tetikleniyor
+- `_safe_shutdown()` tüm bileşenleri kapatıyor
+
+**Verification:**
+- 484 tests passing, 9 pre-existing failed, 0 regressions ✅
+- `test_sprint52_fixes.py` genişletildi → 39 tests (Sprint 5.2 + 5.3 coverage)
+- Concurrent load deadlock test ✅

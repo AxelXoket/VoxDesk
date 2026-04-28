@@ -143,11 +143,12 @@ class VoxWebSocket {
         };
     }
 
-    sendChat(message, includeScreen = true) {
+    sendChat(message, includeScreen = true, attachments = []) {
         if (this.chatWs?.readyState === WebSocket.OPEN) {
             this.chatWs.send(JSON.stringify({
                 message,
                 include_screen: includeScreen,
+                attachments,
             }));
         }
     }

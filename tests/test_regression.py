@@ -212,10 +212,10 @@ class TestPrivacyRegression:
 
     @pytest.mark.regression
     def test_visual_memo_prompt_not_empty(self):
-        """Visual memo prompt boş olmamalı."""
+        """Visual memo prompt boş olmamalı ve İngilizce olmalı."""
         from src.llm.types import VISUAL_MEMO_PROMPT
         assert len(VISUAL_MEMO_PROMPT) > 50
-        assert "ekran" in VISUAL_MEMO_PROMPT.lower() or "detay" in VISUAL_MEMO_PROMPT.lower()
+        assert "screen" in VISUAL_MEMO_PROMPT.lower() or "detail" in VISUAL_MEMO_PROMPT.lower()
 
     @pytest.mark.regression
     def test_config_singleton_pattern(self):

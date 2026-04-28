@@ -66,12 +66,14 @@ class TestAudioDecode:
     """Audio decode helper fonksiyonları."""
 
     def test_decode_raw_pcm_valid(self):
-        """Geçerli PCM float32 data → numpy array."""
-        original = np.array([0.1, -0.5, 0.9], dtype=np.float32)
-        raw_bytes = original.tobytes()
+        """Geçerli PCM S16LE data → normalized float32 numpy array."""
+        original_int16 = np.array([3277, -16384, 29491], dtype=np.int16)
+        raw_bytes = original_int16.tobytes()
         result = decode_audio_raw_pcm(raw_bytes)
         assert result is not None
-        np.testing.assert_array_almost_equal(result, original)
+        assert result.dtype == np.float32
+        expected = original_int16.astype(np.float32) / 32768.0
+        np.testing.assert_array_almost_equal(result, expected)
 
     def test_decode_raw_pcm_empty(self):
         """Boş bytes → boş array (crash değil)."""
@@ -81,23 +83,24 @@ class TestAudioDecode:
 
     def test_decode_raw_pcm_single_sample(self):
         """Tek sample."""
-        single = np.array([0.42], dtype=np.float32)
+        single = np.array([13763], dtype=np.int16)  # ~0.42 normalized
         result = decode_audio_raw_pcm(single.tobytes())
         assert len(result) == 1
-        assert abs(result[0] - 0.42) < 1e-5
+        assert abs(result[0] - 13763 / 32768.0) < 1e-5
 
     def test_decode_raw_pcm_preserves_negative(self):
         """Negatif değerler korunmalı."""
-        neg = np.array([-0.99, -0.5, -0.01], dtype=np.float32)
+        neg = np.array([-32440, -16384, -328], dtype=np.int16)
         result = decode_audio_raw_pcm(neg.tobytes())
-        np.testing.assert_array_almost_equal(result, neg)
+        expected = neg.astype(np.float32) / 32768.0
+        np.testing.assert_array_almost_equal(result, expected)
 
     def test_decode_raw_pcm_silence(self):
         """Sıfır değerli ses."""
-        silence = np.zeros(1000, dtype=np.float32)
+        silence = np.zeros(1000, dtype=np.int16)
         result = decode_audio_raw_pcm(silence.tobytes())
         assert len(result) == 1000
-        assert np.all(result == 0)
+        assert np.all(result == 0.0)
 
     def test_decode_webm_import_guard(self):
         """decode_audio_webm geçersiz data → None döndürmeli."""
@@ -202,9 +205,11 @@ class TestWSMessageContracts:
             "start", "token", "end",          # chat stream
             "audio",                           # voice input
             "stt_result", "stt_empty",         # stt
+            "stt_translated",                  # translator
             "llm_response",                    # llm
             "tts_audio",                       # tts
             "frame",                           # screen
+            "voice_error",                     # error
         ]
         assert len(types) == len(set(types))
 
@@ -308,7 +313,7 @@ class TestHealthStatusEndpoints:
         from src.main import runtime_status
         import asyncio
         result = asyncio.run(runtime_status())
-        for key in ("stt", "llm", "tts"):
+        for key in ("stt", "llm", "tts", "translator"):
             assert "name" in result["models"][key]
             assert "state" in result["models"][key]
 
@@ -410,11 +415,17 @@ class TestCheckOrigin:
 
     @pytest.mark.regression
     def test_missing_origin_allowed(self):
-        """Missing/empty origin = non-browser client, should pass."""
+        """Missing origin (None) = non-browser client, should pass."""
         from src.websocket_manager import check_origin
         allowed = ["http://127.0.0.1:*"]
-        assert check_origin("", allowed) is True
         assert check_origin(None, allowed) is True
+
+    @pytest.mark.regression
+    def test_empty_origin_rejected(self):
+        """Empty string origin = suspicious, should be rejected."""
+        from src.websocket_manager import check_origin
+        allowed = ["http://127.0.0.1:*"]
+        assert check_origin("", allowed) is False
 
 
 # ══════════════════════════════════════════════════════════════
@@ -426,7 +437,7 @@ class TestVRAMFeatureFlag:
 
     @pytest.mark.regression
     def test_vram_manager_not_running_by_default(self):
-        """Default enable_vram_unload=false → monitor should NOT be running."""
+        """VRAMManager._running should start as False (monitor is not started in constructor)."""
         from src.vram_manager import VRAMManager
         vm = VRAMManager()
         assert vm._running is False

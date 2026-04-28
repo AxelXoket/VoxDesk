@@ -1,6 +1,6 @@
-﻿"""
+"""
 VoxDesk — Global Hotkey Manager
-3 ayrı kısayol: activate, toggle continuous, push-to-talk.
+4 ayrı kısayol: activate, toggle continuous, push-to-talk, pin-screen.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ logger = logging.getLogger("voxdesk.hotkey")
 class HotkeyManager:
     """
     Global keyboard kısayol yöneticisi.
-    3 ayrı kısayol: activate, toggle_listen, push_to_talk.
+    4 ayrı kısayol: activate, toggle_listen, push_to_talk, pin_screen.
     """
 
     def __init__(
@@ -23,10 +23,12 @@ class HotkeyManager:
         activate_key: str = "ctrl+shift+space",
         toggle_listen_key: str = "ctrl+shift+v",
         push_to_talk_key: str = "ctrl+shift+b",
+        pin_screen_key: str = "ctrl+shift+s",
     ):
         self.activate_key = activate_key
         self.toggle_listen_key = toggle_listen_key
         self.push_to_talk_key = push_to_talk_key
+        self.pin_screen_key = pin_screen_key
 
         self._callbacks: dict[str, Callable] = {}
         self._ptt_release_callback: Callable | None = None
@@ -51,7 +53,8 @@ class HotkeyManager:
             f"⌨️ Hotkeys aktif — "
             f"Activate: {self.activate_key}, "
             f"Toggle: {self.toggle_listen_key}, "
-            f"PTT: {self.push_to_talk_key}"
+            f"PTT: {self.push_to_talk_key}, "
+            f"Pin: {self.pin_screen_key}"
         )
 
     def _register_hotkeys(self) -> None:
@@ -70,6 +73,13 @@ class HotkeyManager:
             keyboard.add_hotkey(
                 self.toggle_listen_key,
                 lambda: self._fire("toggle_listen"),
+                suppress=True,
+            )
+
+            # Pin screen — capture current screen for next message
+            keyboard.add_hotkey(
+                self.pin_screen_key,
+                lambda: self._fire("pin_screen"),
                 suppress=True,
             )
 
@@ -105,6 +115,16 @@ class HotkeyManager:
                 _check_ptt_release,
                 suppress=False,
             )
+
+            # Also release PTT if any modifier key is released
+            parts = self.push_to_talk_key.split("+")
+            modifiers = parts[:-1]
+            for mod in modifiers:
+                keyboard.on_release_key(
+                    mod,
+                    _check_ptt_release,
+                    suppress=False,
+                )
 
             # Thread'i canlı tut
             keyboard.wait()

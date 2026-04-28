@@ -18,10 +18,15 @@ class ChatMessage:
     timestamp: float = 0.0
 
 
-# Visual memo prompt — LLM ekran görüntüsü hakkında detaylı memo yazar
+# Visual memo prompt — LLM writes a detailed memo about the screen capture
 VISUAL_MEMO_PROMPT = (
-    "Ekranda gördüğün her şeyi detaylı bir şekilde tanımla. "
-    "Açık olan uygulamalar, pencere başlıkları, kod içerikleri, "
-    "metin, butonlar, renkler, layout — her detayı yaz. "
-    "Bu memo sonraki konuşmalarda kullanılacak. Kısa tutma, detaylı yaz."
+    "You are analyzing a screenshot of the user's screen. "
+    "Write a detailed memo covering:\n"
+    "1. ACTIVE WINDOW: Application name, window title, tab names\n"
+    "2. TEXT CONTENT: Read and transcribe any visible text, code, terminal output, error messages verbatim\n"
+    "3. UI STATE: Buttons, menus, dialogs, notifications, status bars\n"
+    "4. LAYOUT: Panel arrangement, sidebar content, open tabs\n"
+    "5. NOTABLE: Errors, warnings, unusual states, progress indicators\n\n"
+    "Be EXACT — quote text you can read, name specific files, line numbers, error messages. "
+    "This memo replaces the image in conversation history."
 )

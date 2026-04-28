@@ -1,4 +1,4 @@
-﻿"""
+"""
 VoxDesk — VRAM Manager
 GPU bellek izleme ve model lifecycle koordinasyonu.
 torch.cuda.is_available() guard — GPU yoksa crash yok, safe report döner.
@@ -77,22 +77,31 @@ class VRAMManager:
         self.poll_interval_seconds = poll_interval_seconds
 
         self._models: dict[str, ManagedModel] = {}
+        self._model_timeouts: dict[str, float] = {}  # per-model idle override
         self._lock = threading.Lock()
         self._monitor_task: asyncio.Task | None = None
         self._running = False
 
     # ── Model Registration ───────────────────────────────────
 
-    def register_model(self, name: str, model: ManagedModel) -> None:
-        """İzlenecek model kaydet."""
+    def register_model(
+        self,
+        name: str,
+        model: ManagedModel,
+        idle_timeout_seconds: float | None = None,
+    ) -> None:
+        """İzlenecek model kaydet. idle_timeout_seconds ile model bazlı timeout."""
         with self._lock:
             self._models[name] = model
+            if idle_timeout_seconds is not None:
+                self._model_timeouts[name] = idle_timeout_seconds
             logger.debug(f"VRAM: {name} modeli izlemeye alındı")
 
     def unregister_model(self, name: str) -> None:
         """Modeli izlemeden çıkar."""
         with self._lock:
             self._models.pop(name, None)
+            self._model_timeouts.pop(name, None)
 
     # ── Monitor Lifecycle ────────────────────────────────────
 
@@ -135,18 +144,23 @@ class VRAMManager:
                     models_snapshot = dict(self._models)
 
                 for name, model in models_snapshot.items():
-                    # Idle check
+                    # Idle check — model bazlı veya global timeout
+                    timeout = self._model_timeouts.get(
+                        name, self.idle_timeout_seconds
+                    )
                     if model.is_idle:
                         h = model.health()
                         last_used = h.get("last_used")
                         if last_used is not None:
                             idle_secs = now - last_used
-                            if idle_secs >= self.idle_timeout_seconds:
+                            if idle_secs >= timeout:
                                 logger.info(
                                     f"VRAM: {name} idle {idle_secs:.0f}s "
-                                    f"≥ {self.idle_timeout_seconds}s — unload"
+                                    f"≥ {timeout}s — unload"
                                 )
-                                model.safe_unload()
+                                # run_in_executor: safe_unload may block on GPU cleanup
+                                loop = asyncio.get_running_loop()
+                                await loop.run_in_executor(None, model.safe_unload)
 
                 # Metrics güncelle
                 self._update_metrics()

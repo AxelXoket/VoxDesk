@@ -6,9 +6,9 @@
   <p align="center">
     <img src="https://img.shields.io/badge/python-3.12+-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python">
     <img src="https://img.shields.io/badge/license-GPL--3.0-blue?style=flat-square" alt="License">
-    <img src="https://img.shields.io/badge/version-0.2.0-orange?style=flat-square" alt="Version">
+    <img src="https://img.shields.io/badge/version-0.5.0-orange?style=flat-square" alt="Version">
     <img src="https://img.shields.io/badge/privacy-100%25_local-brightgreen?style=flat-square" alt="Privacy">
-    <img src="https://img.shields.io/badge/tests-390_passed-success?style=flat-square" alt="Tests">
+    <img src="https://img.shields.io/badge/tests-484_passed-success?style=flat-square" alt="Tests">
     <img src="https://img.shields.io/badge/CUDA-12.8-76B900?style=flat-square&logo=nvidia&logoColor=white" alt="CUDA">
   </p>
 </p>
@@ -93,12 +93,13 @@ Download GGUF model files and place them under `models/`:
 
 ```
 models/
-  minicpm-v4.5-official/
-    model-q6_k.gguf         # MiniCPM-V 4.5 Q6_K (6.72 GB)
-    mmproj-f16.gguf          # Vision projector F16 (1.1 GB)
+  Qwen2.5-VL-7B/
+    Qwen_Qwen2.5-VL-7B-Instruct-Q8_0.gguf    # Primary LLM
+    mmproj-Qwen_Qwen2.5-VL-7B-Instruct-f16.gguf  # Vision projector
+  whisper-large-v3-turbo/                      # STT model (CTranslate2)
+  opus-mt-tr-en/                               # TR→EN translator
 ```
 
-> Models are available from [openbmb/MiniCPM-V-4_5-gguf](https://huggingface.co/openbmb/MiniCPM-V-4_5-gguf) on HuggingFace.
 > Any GGUF-compatible model can be used — update `config/default.yaml` accordingly.
 
 ### Running
@@ -153,7 +154,7 @@ personality: "my_assistant"
 ## Testing
 
 ```powershell
-# Full test suite (390 tests)
+# Full test suite (484 tests)
 python -m pytest
 
 # With coverage report
@@ -162,14 +163,14 @@ python -m pytest --cov=src --cov-fail-under=55
 # Quick run (skip benchmarks)
 python -m pytest --no-benchmarks
 
-# Regression tests only (59 tests)
+# Regression tests only (83 tests)
 python -m pytest -m regression
 ```
 
 | Category | Count | Purpose |
 |:---|:---:|:---|
-| Unit | ~310 | Core logic validation |
-| Regression | ~60 | Privacy, config mapping, endpoint contracts, prompt safety |
+| Unit | ~175 | Core logic validation |
+| Regression | ~83 | Privacy, config mapping, endpoint contracts, prompt safety, audit fixes |
 | Benchmark | 4 | Performance baselines |
 | GPU | 1 | CUDA smoke test (auto-skipped if no GPU) |
 
@@ -188,15 +189,19 @@ VoxDesk/
 │   │   └── history.py          # Conversation history
 │   ├── stt.py                  # faster-whisper STT
 │   ├── tts.py                  # Kokoro TTS
+│   ├── translator.py           # MarianMT TR→EN translator
 │   ├── capture.py              # DXCam screen capture
 │   ├── vram_manager.py         # GPU memory lifecycle
 │   ├── model_state.py          # ManagedModel state machine
 │   ├── registry.py             # Module registry (DI)
 │   ├── audio_protocol.py       # Binary PCM protocol v1
+│   ├── audio_utils.py          # PCM decode/encode helpers
 │   ├── isolation.py            # Network isolation enforcer
 │   ├── websocket_manager.py    # WebSocket lifecycle manager
+│   ├── hotkey.py               # Global keyboard shortcuts
+│   ├── tray.py                 # System tray icon
 │   └── routes/                 # API route handlers
-│       ├── chat.py             # /ws/chat streaming
+│       ├── chat.py             # /ws/chat, /ws/screen, /ws/voice
 │       ├── voice_v2.py         # /ws/voice/v2 binary audio
 │       ├── history.py          # Chat history export
 │       └── settings.py         # Runtime settings API
@@ -217,7 +222,7 @@ VoxDesk/
 │   ├── default.yaml            # Application configuration
 │   └── personalities/          # AI personality profiles
 │       └── voxly.yaml          # Default personality
-├── tests/                      # 390+ tests
+├── tests/                      # 484+ tests
 ├── docs/                       # Documentation
 │   ├── architecture.md         # Technical reference
 │   ├── dependency_matrix.md    # Verified dependency versions
@@ -239,12 +244,12 @@ app:
 
 llm:
   provider: "llama-cpp"
-  model_path: "models/minicpm-v4.5-official/model-q6_k.gguf"
-  mmproj_path: "models/minicpm-v4.5-official/mmproj-f16.gguf"
+  model_path: "models/Qwen2.5-VL-7B/Qwen_Qwen2.5-VL-7B-Instruct-Q8_0.gguf"
+  mmproj_path: "models/Qwen2.5-VL-7B/mmproj-Qwen_Qwen2.5-VL-7B-Instruct-f16.gguf"
   n_gpu_layers: -1          # -1 = full GPU offload
   n_ctx: 8192
-  temperature: 0.7
-  max_tokens: 2048
+  temperature: 0.4
+  max_tokens: 512
 
 stt:
   engine: "faster-whisper"

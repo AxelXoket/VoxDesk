@@ -1,8 +1,8 @@
 # VoxDesk — Dependency Compatibility Matrix
 
-> Sprint 4 donanım doğrulaması tamamlanmış bağımlılık tablosu.
+> Sprint 5.3 donanım doğrulaması tamamlanmış bağımlılık tablosu.
 > RTX 5080 = Blackwell mimarisi (SM 12.0, compute capability 12.0).
-> Son güncelleme: 2026-04-27
+> Son güncelleme: 2026-04-28
 
 ---
 
@@ -20,7 +20,10 @@
 | kokoro | latest | güncel | ✅ | ✅ | TTS engine |
 | dxcam | ≥0.3 | güncel | — | ✅ | Windows screen capture |
 | llama-cpp-python | latest | 0.3.20 | ✅ | ✅ | CUDA 12.8, SM 120 build |
-| opencv-python-headless | ≥4.10 | güncel | — | ✅ | |
+| transformers | ≥4.40 | güncel | — | ✅ | MarianMT backend |
+| sentencepiece | ≥0.2 | güncel | — | ✅ | MarianMT tokenizer |
+| sacremoses | ≥2.1 | güncel | — | ✅ | MarianMT tokenizer util |
+| espeak-ng | 1.52.0 | 1.52.0 | — | ✅ | System MSI — Kokoro phonemizer |
 
 ## Model Files
 
@@ -29,16 +32,20 @@
 | MiniCPM-V 4.5 Official | Q6_K | 6.26 GB | `models/minicpm-v4.5-official/model-q6_k.gguf` | ✅ |
 | MiniCPM-V 4.5 mmproj | F16 | 1.02 GB | `models/minicpm-v4.5-official/mmproj-f16.gguf` | ✅ |
 | MiniCPM-V 4.5 Abliterated | Q6_K | — | `models/minicpm-v4.5-abliterated/` | ⏳ Onay bekleniyor |
+| MarianMT opus-mt-tr-en | float16 | ~300 MB | `models/opus-mt-tr-en/` | ✅ |
+| Whisper large-v3-turbo | CTranslate2 FP16 | ~1.5 GB | `models/whisper-large-v3-turbo/` | ✅ |
 
 ## VRAM Budget (RTX 5080 — 16 GB)
 
-| Component | Estimated VRAM | Notes |
-|:----------|:---------------|:------|
-| LLM (Q6_K, full offload) | ~7 GB | n_gpu_layers=-1 |
-| mmproj (F16) | ~1.1 GB | Vision encoder |
-| STT (large-v3-turbo) | ~1.5 GB | CTranslate2 |
-| TTS (Kokoro) | ~0.5 GB | |
-| **Toplam** | **~10 GB** | ~6 GB headroom |
+| Component | Estimated VRAM | Measured | Idle Unload | Notes |
+|:----------|:---------------|:---------|:------------|:------|
+| LLM (Q6_K, full offload) | ~7 GB | — | ❌ Always warm | n_gpu_layers=-1 |
+| mmproj (F16) | ~1.1 GB | — | ❌ With LLM | Vision encoder |
+| STT (large-v3-turbo) | ~3 GB | — | ✅ 3 min | CTranslate2 |
+| TTS (Kokoro) | ~2 GB | — | ✅ 3 min | |
+| Translator (MarianMT) | ~600 MB | **146 MB** | ✅ 3 min | PyTorch float16 |
+| **Active total** | **~12.1 GB** | | | 76% of 16 GB |
+| **Idle total** | **~7 GB** | | | 44% — LLM only |
 
 ## Verified Smoke Commands
 
@@ -63,5 +70,5 @@ python -c "from llama_cpp import Llama; m=Llama(model_path='models/minicpm-v4.5-
 
 # Full test suite
 python -m pytest -q --no-header
-# 390 passed, 1 skipped
+# 484 passed, 1 skipped
 ```

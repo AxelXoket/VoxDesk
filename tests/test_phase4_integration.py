@@ -1,4 +1,4 @@
-﻿"""
+"""
 VoxDesk — Phase 4 Integration Tests
 STT/TTS ManagedModel lifecycle, VRAM manager wiring, config validation.
 GERÇEK MODEL YÜKLEME YOK — tüm testler mock/fake ile.
@@ -168,6 +168,194 @@ class TestVRAMManagerWithEngines:
         assert report["models"]["stt"]["state"] == "unloaded"
         assert report["models"]["tts"]["state"] == "unloaded"
 
+    @pytest.mark.unit
+    def test_vram_manager_per_model_timeout(self):
+        """Per-model idle timeout kaydı çalışmalı."""
+        from src.vram_manager import VRAMManager
+        from src.stt import SpeechRecognizer
+
+        stt = SpeechRecognizer(activation_threshold_db=-30.0)
+        vm = VRAMManager(idle_timeout_seconds=120.0)
+        vm.register_model("stt", stt._lifecycle, idle_timeout_seconds=300.0)
+
+        assert vm._model_timeouts["stt"] == 300.0
+
+    @pytest.mark.unit
+    def test_vram_manager_unregister_clears_timeout(self):
+        """unregister_model per-model timeout'u da temizlemeli."""
+        from src.vram_manager import VRAMManager
+        from src.stt import SpeechRecognizer
+
+        stt = SpeechRecognizer(activation_threshold_db=-30.0)
+        vm = VRAMManager()
+        vm.register_model("stt", stt._lifecycle, idle_timeout_seconds=300.0)
+        vm.unregister_model("stt")
+
+        assert "stt" not in vm._model_timeouts
+        assert "stt" not in vm._models
+
+
+# ══════════════════════════════════════════════════════════════
+#  Translator Lifecycle
+# ══════════════════════════════════════════════════════════════
+
+class TestTranslatorLifecycle:
+    """Translator ManagedModel lifecycle."""
+
+    @pytest.mark.unit
+    def test_translator_has_lifecycle_methods(self):
+        """Translator close/health/safe_unload/acquire/release sahip olmalı."""
+        from src.translator import Translator
+        tr = Translator(model_path="models/fake-model", enabled=True)
+        assert callable(tr.close)
+        assert callable(tr.health)
+        assert callable(tr.safe_unload)
+        assert callable(tr.acquire)
+        assert callable(tr.release)
+
+    @pytest.mark.unit
+    def test_translator_initial_state(self):
+        """Translator başlangıç state'i UNLOADED olmalı."""
+        from src.translator import Translator
+        tr = Translator(model_path="models/fake-model")
+        h = tr.health()
+        assert h["state"] == "unloaded"
+        assert h["ref_count"] == 0
+        assert h["enabled"] is True
+        assert h["model_path"] == "models/fake-model"
+
+    @pytest.mark.unit
+    def test_translator_close_no_crash(self):
+        """close() unloaded state'te crash etmemeli."""
+        from src.translator import Translator
+        tr = Translator(model_path="models/fake-model")
+        tr.close()  # No exception
+        assert tr._lifecycle.state == ModelState.UNLOADED
+
+    @pytest.mark.unit
+    def test_translator_bypass_english(self):
+        """source_lang='en' ise çeviri yapmamalı (identity return)."""
+        from src.translator import Translator
+        tr = Translator(model_path="models/fake-model")
+        result = tr.translate("Hello world", "en")
+        assert result == "Hello world"
+
+    @pytest.mark.unit
+    def test_translator_bypass_disabled(self):
+        """enabled=False ise çeviri yapmamalı."""
+        from src.translator import Translator
+        tr = Translator(model_path="models/fake-model", enabled=False)
+        result = tr.translate("Merhaba dünya", "tr")
+        assert result == "Merhaba dünya"
+
+    @pytest.mark.unit
+    def test_translator_bypass_empty(self):
+        """Boş metin bypass edilmeli."""
+        from src.translator import Translator
+        tr = Translator(model_path="models/fake-model")
+        result = tr.translate("", "tr")
+        assert result == ""
+        result2 = tr.translate("   ", "tr")
+        assert result2 == "   "
+
+    @pytest.mark.unit
+    def test_translator_safe_unload_blocks_when_active(self):
+        """Aktif çeviri sırasında safe_unload False dönmeli."""
+        from src.translator import Translator
+        tr = Translator(
+            model_path="models/fake-model",
+            min_loaded_seconds=0,
+            unload_cooldown_seconds=0,
+        )
+        # Manuel state — gerçek model yükleme olmadan
+        tr._lifecycle._state = ModelState.LOADED
+        tr._lifecycle._loaded_at = 0
+        tr._lifecycle._last_used = 0
+
+        tr.acquire()
+        assert tr._lifecycle.ref_count == 1
+        assert tr._lifecycle.state == ModelState.IN_USE
+        assert tr.safe_unload() is False
+
+        tr.release()
+        assert tr._lifecycle.ref_count == 0
+        assert tr.safe_unload() is True
+
+    @pytest.mark.unit
+    def test_translator_vram_manager_registration(self):
+        """Translator VRAMManager'a register edilebilmeli."""
+        from src.vram_manager import VRAMManager
+        from src.translator import Translator
+
+        tr = Translator(model_path="models/fake-model")
+        vm = VRAMManager()
+        vm.register_model("translator", tr._lifecycle, idle_timeout_seconds=180.0)
+
+        report = vm.get_report()
+        assert "translator" in report["models"]
+        assert report["models"]["translator"]["state"] == "unloaded"
+        assert vm._model_timeouts["translator"] == 180.0
+
+
+# ══════════════════════════════════════════════════════════════
+#  Translator Config
+# ══════════════════════════════════════════════════════════════
+
+class TestTranslatorConfig:
+    """TranslatorConfig validation."""
+
+    @pytest.mark.unit
+    def test_translator_config_defaults(self):
+        """TranslatorConfig defaults doğru olmalı."""
+        from src.config import TranslatorConfig
+        cfg = TranslatorConfig()
+        assert cfg.engine == "marian"
+        assert cfg.model_path == "models/opus-mt-tr-en"
+        assert cfg.device == "cuda"
+        assert cfg.enabled is True
+
+    @pytest.mark.unit
+    def test_translator_config_extra_forbid(self):
+        """TranslatorConfig bilinmeyen field'ı reddetmeli."""
+        from src.config import TranslatorConfig
+        from pydantic import ValidationError
+        with pytest.raises(ValidationError):
+            TranslatorConfig(unknown_field="value")
+
+    @pytest.mark.unit
+    def test_appconfig_has_translator(self):
+        """AppConfig'te translator section'ı olmalı."""
+        from src.config import TranslatorConfig
+        cfg = AppConfig()
+        assert hasattr(cfg, "translator")
+        assert isinstance(cfg.translator, TranslatorConfig)
+
+    @pytest.mark.regression
+    def test_translator_local_files_only_enforced(self):
+        """Translator from_pretrained local_files_only=True kullanmalı."""
+        import ast
+        source = Path(__file__).parent.parent / "src" / "translator.py"
+        content = source.read_text(encoding="utf-8")
+        tree = ast.parse(content)
+
+        # from_pretrained çağrılarını bul
+        calls_found = 0
+        local_files_only_found = 0
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call):
+                func = node.func
+                if isinstance(func, ast.Attribute) and func.attr == "from_pretrained":
+                    calls_found += 1
+                    for kw in node.keywords:
+                        if kw.arg == "local_files_only":
+                            local_files_only_found += 1
+
+        assert calls_found >= 2, "from_pretrained en az 2 kez çağrılmalı"
+        assert local_files_only_found == calls_found, (
+            f"from_pretrained çağrılarının hepsi local_files_only=True kullanmalı "
+            f"({local_files_only_found}/{calls_found})"
+        )
+
 
 # ══════════════════════════════════════════════════════════════
 #  Config VRAM Defaults
@@ -181,8 +369,9 @@ class TestVRAMConfig:
         """VRAMConfig defaults güvenli olmalı."""
         cfg = VRAMConfig()
         assert cfg.monitor_interval_seconds == 30.0
-        assert cfg.stt_idle_unload_seconds == 120.0
-        assert cfg.tts_idle_unload_seconds == 120.0
+        assert cfg.stt_idle_unload_seconds == 180.0
+        assert cfg.tts_idle_unload_seconds == 180.0
+        assert cfg.translator_idle_unload_seconds == 180.0
         assert cfg.min_loaded_seconds == 30.0
         assert cfg.unload_cooldown_seconds == 10.0
         assert cfg.keep_warm is False

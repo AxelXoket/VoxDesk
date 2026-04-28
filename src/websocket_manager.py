@@ -132,8 +132,10 @@ def check_origin(origin: str, allowed: List[str]) -> bool:
 
     Sprint 1 Task 5 — OWASP WebSocket Origin validation.
     """
-    if not origin:
-        return True  # Missing origin → non-browser client, allow
+    if origin is None:
+        return True  # Missing origin header → non-browser/test client, allow
+    if origin == "":
+        return False  # Explicitly empty origin → suspicious, reject
 
     for pattern in allowed:
         if "*" in pattern:

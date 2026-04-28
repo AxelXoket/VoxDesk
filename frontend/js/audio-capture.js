@@ -361,11 +361,12 @@ class AudioCapture {
 
             const blob = new Blob(chunks, { type: options.mimeType });
             const buffer = await blob.arrayBuffer();
-            const base64 = btoa(
-                new Uint8Array(buffer).reduce(
+            // Use safe chunked base64 encoder (app.js) — btoa crashes on >2MB
+            const base64 = (typeof window.arrayBufferToBase64 === 'function')
+                ? window.arrayBufferToBase64(buffer)
+                : btoa(new Uint8Array(buffer).reduce(
                     (data, byte) => data + String.fromCharCode(byte), ''
-                )
-            );
+                ));
 
             // Legacy base64 path — Sprint 3.5: transport adapter
             if (this._transport.isOpen()) {

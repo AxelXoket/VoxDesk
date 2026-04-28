@@ -78,6 +78,7 @@ model_loading:
 | Tarih | Denetim | Sonuç |
 |:------|:--------|:------|
 | 2026-04-27 | Sprint 3 Post-Audit + Cross-Reference | ✅ Uyumlu — bilinçli veri çıkışı yok |
+| 2026-04-28 | Sprint 5.2+5.3 Audit Triage (100 bug) | ✅ Path leak kapatıldı, DNS çıkışı kaldırıldı, origin bypass düzeltildi |
 | — | Sprint 4 model downloader | ⏳ Henüz yazılmadı — policy uygulanacak |
 
 ---

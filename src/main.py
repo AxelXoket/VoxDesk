@@ -26,14 +26,18 @@ from src.capture import ScreenCapture
 from src.llm import LlamaCppProvider
 from src.stt import SpeechRecognizer
 from src.tts import VoiceSynth
+from src.translator import Translator
 from src.websocket_manager import ConnectionManager
 from src.hotkey import HotkeyManager
 from src.tray import TrayIcon
 
 # Version — single source from pyproject.toml
 _pyproject = Path(__file__).parent.parent / "pyproject.toml"
-with open(_pyproject, "rb") as _f:
-    APP_VERSION = tomllib.load(_f)["project"]["version"]
+try:
+    with open(_pyproject, "rb") as _f:
+        APP_VERSION = tomllib.load(_f)["project"]["version"]
+except Exception:
+    APP_VERSION = "0.0.0-unknown"
 
 # Logging setup
 logging.basicConfig(
@@ -55,6 +59,7 @@ class AppState:
     llm: LlamaCppProvider | None = None
     stt: SpeechRecognizer | None = None
     tts: VoiceSynth | None = None
+    translator: Translator | None = None
     ws_manager: ConnectionManager = field(default_factory=ConnectionManager)
     hotkey_manager: HotkeyManager | None = None
     tray: TrayIcon | None = None
@@ -99,7 +104,7 @@ async def lifespan(app: FastAPI):
     _state = AppState(config=config)
 
     # 3. Registry — factory catalog'u oluştur
-    _register_default_factories(_state.registry)
+    _register_default_factories(_state.registry, config.vram)
     logger.info(f"  📦 Registry: {len(_state.registry.list_modules())} kind kaydedildi")
 
     # 4. Bileşenleri oluştur (registry.create — startup'ta BİR KEZ)
@@ -136,6 +141,19 @@ async def lifespan(app: FastAPI):
         )
         logger.info(f"  🔊 TTS: {config.tts.voice}")
 
+        # Translator — degraded mode if model missing
+        try:
+            _state.translator = _state.registry.create(
+                "translator", config.translator.engine, config.translator
+            )
+            logger.info(f"  🔄 Translator: {config.translator.model_path}")
+        except FileNotFoundError as e:
+            logger.warning(f"  ⚠️ Translator unavailable (degraded mode): {e}")
+            _state.translator = None
+        except Exception as e:
+            logger.error(f"  ❌ Translator load error (degraded mode): {e}")
+            _state.translator = None
+
         # Sprint 3: ws_manager metrics injection (dataclass default'ta yaratıldığı için burada)
         _state.ws_manager.set_metrics(_state.metrics)
 
@@ -149,9 +167,20 @@ async def lifespan(app: FastAPI):
             poll_interval_seconds=config.vram.monitor_interval_seconds,
         )
         if _state.stt:
-            _state.vram_manager.register_model("stt", _state.stt._lifecycle)
+            _state.vram_manager.register_model(
+                "stt", _state.stt._lifecycle,
+                idle_timeout_seconds=config.vram.stt_idle_unload_seconds,
+            )
         if _state.tts:
-            _state.vram_manager.register_model("tts", _state.tts._lifecycle)
+            _state.vram_manager.register_model(
+                "tts", _state.tts._lifecycle,
+                idle_timeout_seconds=config.vram.tts_idle_unload_seconds,
+            )
+        if _state.translator:
+            _state.vram_manager.register_model(
+                "translator", _state.translator._lifecycle,
+                idle_timeout_seconds=config.vram.translator_idle_unload_seconds,
+            )
 
         # Sprint 1 Task 8: only start idle-unload monitor when feature flag is on
         if config.features.enable_vram_unload:
@@ -165,11 +194,24 @@ async def lifespan(app: FastAPI):
             activate_key=config.hotkeys.activate,
             toggle_listen_key=config.hotkeys.toggle_listen,
             push_to_talk_key=config.hotkeys.push_to_talk,
+            pin_screen_key=config.hotkeys.pin_screen,
         )
+        # Pin screen callback — hotkey'den capture.pin_current_frame() çağır
+        if _state.capture:
+            _state.hotkey_manager.set_callback(
+                "pin_screen", _state.capture.pin_current_frame
+            )
         _state.hotkey_manager.start()
 
         # System Tray — doğrudan (registry dışı, UI component)
-        _state.tray = TrayIcon()
+        def _tray_quit():
+            """Tray'den çıkış — uygulamayı tamamen kapat."""
+            logger.info("🛑 Tray quit triggered — shutting down...")
+            import os
+            import signal
+            os.kill(os.getpid(), signal.SIGINT)
+
+        _state.tray = TrayIcon(on_quit=_tray_quit)
         _state.tray.start()
 
         # Kişilik selamlaması
@@ -193,12 +235,15 @@ async def lifespan(app: FastAPI):
 
 # ── Factory Registration ─────────────────────────────────────
 
-def _register_default_factories(registry: ModuleRegistry) -> None:
+def _register_default_factories(registry: ModuleRegistry, vram: "VRAMConfig | None" = None) -> None:
     """
     Default engine factory'lerini registry'ye kaydet.
     Her factory config alır, engine instance döndürür.
     Startup sırasında bir kez çağrılır.
     """
+    from src.config import VRAMConfig
+    _vram = vram or VRAMConfig()
+
     # Capture
     registry.register(
         "capture", "dxcam",
@@ -221,14 +266,20 @@ def _register_default_factories(registry: ModuleRegistry) -> None:
     )
 
     # STT
+    _stt_context = get_config().personality.stt_context or None
     registry.register(
         "stt", "faster-whisper",
         lambda cfg: SpeechRecognizer(
             model_name=cfg.model,
+            model_path=cfg.model_path,
             device=cfg.device,
             compute_type=cfg.compute_type,
             language=cfg.language,
             vad_enabled=cfg.vad_enabled,
+            initial_prompt=_stt_context,
+            min_loaded_seconds=_vram.min_loaded_seconds,
+            unload_cooldown_seconds=_vram.unload_cooldown_seconds,
+            keep_warm=_vram.keep_warm,
         ),
         requires_gpu=True,
         description="faster-whisper STT",
@@ -242,9 +293,27 @@ def _register_default_factories(registry: ModuleRegistry) -> None:
             speed=cfg.speed,
             lang_code=cfg.lang_code,
             enabled=cfg.enabled,
+            min_loaded_seconds=_vram.min_loaded_seconds,
+            unload_cooldown_seconds=_vram.unload_cooldown_seconds,
+            keep_warm=_vram.keep_warm,
         ),
         requires_gpu=True,
         description="Kokoro TTS",
+    )
+
+    # Translator — MarianMT TR→EN
+    registry.register(
+        "translator", "marian",
+        lambda cfg: Translator(
+            model_path=cfg.model_path,
+            device=cfg.device,
+            enabled=cfg.enabled,
+            min_loaded_seconds=_vram.min_loaded_seconds,
+            unload_cooldown_seconds=_vram.unload_cooldown_seconds,
+            keep_warm=_vram.keep_warm,
+        ),
+        requires_gpu=True,
+        description="MarianMT TR→EN translator",
     )
 
 
@@ -288,6 +357,13 @@ async def _safe_shutdown() -> None:
             _state.tts.close()
     except Exception as e:
         logger.error(f"TTS shutdown hatası: {e}")
+
+    # Translator
+    try:
+        if _state.translator:
+            _state.translator.close()
+    except Exception as e:
+        logger.error(f"Translator shutdown hatası: {e}")
 
     # LLM
     try:
@@ -440,6 +516,7 @@ async def runtime_status():
         "stt": _model_info(state.stt, "model_name"),
         "llm": _model_info(state.llm, "model_name"),
         "tts": _model_info(state.tts, "voice"),
+        "translator": _model_info(state.translator, "model_path"),
     }
 
     # Features — booleans only from config
@@ -507,6 +584,11 @@ async def debug_metrics():
             "provider": state.config.llm.provider,
             "model": state.llm.model_name if state.llm else None,
             "loaded": state.llm.is_loaded if state.llm else False,
+        },
+        "translator": {
+            "engine": state.config.translator.engine,
+            "model_path": state.config.translator.model_path,
+            "enabled": state.config.translator.enabled,
         },
     }
 

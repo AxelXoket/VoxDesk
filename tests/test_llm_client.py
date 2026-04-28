@@ -278,9 +278,10 @@ class TestProviderMessageBuilding:
         mock_config.context_messages = 5
 
         with patch("src.llm.provider.get_config") as mock_cfg:
-            mock_personality = MagicMock()
-            mock_personality.system_prompt = "You are a helpful AI assistant."
-            mock_cfg.return_value.personality = mock_personality
+            from src.config import PersonalityConfig
+            mock_cfg.return_value.personality = PersonalityConfig(
+                system_prompt="You are a helpful AI assistant."
+            )
             p = LlamaCppProvider(mock_config)
         return p
 
@@ -305,9 +306,10 @@ class TestProviderMessageBuilding:
         mock_config.context_messages = 5
 
         with patch("src.llm.provider.get_config") as mock_cfg:
-            mock_personality = MagicMock()
-            mock_personality.system_prompt = ""
-            mock_cfg.return_value.personality = mock_personality
+            from src.config import PersonalityConfig
+            mock_cfg.return_value.personality = PersonalityConfig(
+                system_prompt=""
+            )
             p = LlamaCppProvider(mock_config)
 
         msgs = p._build_messages("test")
@@ -433,7 +435,10 @@ class TestProviderChatMocked:
         mock_config.context_messages = 10
 
         with patch("src.llm.provider.get_config") as mock_cfg:
-            mock_cfg.return_value = MagicMock()
+            from src.config import PersonalityConfig
+            mock_cfg_rv = MagicMock()
+            mock_cfg_rv.personality = PersonalityConfig()
+            mock_cfg.return_value = mock_cfg_rv
             p = LlamaCppProvider(mock_config)
 
         # Mock the underlying llama-cpp model

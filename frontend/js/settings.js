@@ -34,6 +34,16 @@ class VoxSettings {
         // Personality select
         this.personalitySelect.addEventListener('change', () => this.updatePersonality());
 
+        // TTS toggle
+        if (this.ttsToggle) {
+            this.ttsToggle.addEventListener('change', () => this.toggleTts());
+        }
+
+        // Voice activation toggle
+        if (this.vaToggle) {
+            this.vaToggle.addEventListener('change', () => this.toggleVoiceActivation());
+        }
+
         // Export history
         this.exportBtn.addEventListener('click', () => this.exportHistory());
 
@@ -145,6 +155,30 @@ class VoxSettings {
                 body: JSON.stringify({ model: this.modelSelect.value }),
             });
         } catch (e) { /* silent */ }
+    }
+
+    async toggleTts() {
+        try {
+            const res = await fetch('/api/tts/toggle', { method: 'PUT' });
+            const data = await res.json();
+            if (data.status === 'ok' && this.ttsToggle) {
+                this.ttsToggle.checked = data.tts_enabled;
+            }
+        } catch (e) {
+            console.error('TTS toggle hatası:', e);
+        }
+    }
+
+    async toggleVoiceActivation() {
+        try {
+            const res = await fetch('/api/voice-activation/toggle', { method: 'PUT' });
+            const data = await res.json();
+            if (data.status === 'ok' && this.vaToggle) {
+                this.vaToggle.checked = data.voice_activation_enabled;
+            }
+        } catch (e) {
+            console.error('Voice activation toggle hatası:', e);
+        }
     }
 
     async updatePersonality() {
