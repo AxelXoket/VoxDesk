@@ -24,8 +24,14 @@ class CapturedFrame:
     """Yakalanan bir frame'in metadata'sı ile birlikte saklanması."""
     image_bytes: bytes       # JPEG sıkıştırılmış bytes
     timestamp: float         # Yakalanma zamanı
-    width: int = 0
-    height: int = 0
+    width: int = 0           # Normalized (resize sonrası) genişlik
+    height: int = 0          # Normalized (resize sonrası) yükseklik
+    # ── Part 1.5: Original resolution tracking ──────────────
+    original_width: int | None = None   # Resize öncesi orijinal genişlik
+    original_height: int | None = None  # Resize öncesi orijinal yükseklik
+    source: str = "capture"             # "capture", "grab_now", "pin"
+    jpeg_quality: int | None = None     # Encode sırasında kullanılan JPEG quality
+    frame_id: int | None = None         # Ring buffer sequence counter
 
 
 class ScreenCapture:
@@ -40,17 +46,29 @@ class ScreenCapture:
         buffer_size: int = 30,
         jpeg_quality: int = 85,
         resize_width: int = 1920,
+        # Part 3: Preview / Inference quality profiles
+        preview_resize_width: int | None = None,
+        preview_jpeg_quality: int | None = None,
+        inference_resize_width: int | None = None,
+        inference_jpeg_quality: int | None = None,
     ):
         self.interval = interval
         self.buffer_size = buffer_size
         self.jpeg_quality = jpeg_quality
         self.resize_width = resize_width
 
+        # Effective profile values (fallback to legacy)
+        self.preview_resize_width = preview_resize_width if preview_resize_width is not None else resize_width
+        self.preview_jpeg_quality = preview_jpeg_quality if preview_jpeg_quality is not None else jpeg_quality
+        self.inference_resize_width = inference_resize_width if inference_resize_width is not None else resize_width
+        self.inference_jpeg_quality = inference_jpeg_quality if inference_jpeg_quality is not None else jpeg_quality
+
         self._buffer: deque[CapturedFrame] = deque(maxlen=buffer_size)
         self._camera = None
         self._running = False
         self._thread: threading.Thread | None = None
         self._lock = threading.Lock()
+        self._frame_counter: int = 0  # Part 1.5: monotonic frame ID
         # Pin mechanism — hotkey ile yakalanan frame
         self._pinned_frame: CapturedFrame | None = None
         self._pin_lock = threading.Lock()
@@ -65,33 +83,57 @@ class ScreenCapture:
             logger.error(f"❌ dxcam başlatılamadı: {e}")
             raise
 
+    def _encode_frame(
+        self,
+        img: Image.Image,
+        profile: str = "preview",
+        source: str = "capture",
+    ) -> CapturedFrame:
+        """
+        PIL Image → CapturedFrame (resize + JPEG encode).
+        profile: "preview" (1280/Q85) veya "inference" (1920/Q92).
+        """
+        orig_w, orig_h = img.width, img.height
+
+        if profile == "inference":
+            rw = self.inference_resize_width
+            jq = self.inference_jpeg_quality
+        else:
+            rw = self.preview_resize_width
+            jq = self.preview_jpeg_quality
+
+        # Resize — 0 = no resize
+        if rw > 0 and img.width > rw:
+            ratio = rw / img.width
+            new_height = int(img.height * ratio)
+            img = img.resize((rw, new_height), Image.LANCZOS)
+
+        # JPEG encode → bytes (bellekte, diske yazmaz)
+        buffer = io.BytesIO()
+        img.save(buffer, format="JPEG", quality=jq)
+        jpeg_bytes = buffer.getvalue()
+
+        self._frame_counter += 1
+        return CapturedFrame(
+            image_bytes=jpeg_bytes,
+            timestamp=time.time(),
+            width=img.width,
+            height=img.height,
+            original_width=orig_w,
+            original_height=orig_h,
+            source=source,
+            jpeg_quality=jq,
+            frame_id=self._frame_counter,
+        )
+
     def _capture_frame(self) -> CapturedFrame | None:
-        """Tek bir frame yakala ve JPEG olarak sıkıştır."""
+        """Tek bir frame yakala — PREVIEW profili (ring buffer için)."""
         try:
             frame = self._camera.grab()
             if frame is None:
                 return None
-
-            # NumPy array -> PIL Image
             img = Image.fromarray(frame)
-
-            # Resize (LLM için optimize) — 0 = no resize
-            if self.resize_width > 0 and img.width > self.resize_width:
-                ratio = self.resize_width / img.width
-                new_height = int(img.height * ratio)
-                img = img.resize((self.resize_width, new_height), Image.LANCZOS)
-
-            # JPEG sıkıştırma -> bytes (bellekte, diske yazmaz)
-            buffer = io.BytesIO()
-            img.save(buffer, format="JPEG", quality=self.jpeg_quality)
-            jpeg_bytes = buffer.getvalue()
-
-            return CapturedFrame(
-                image_bytes=jpeg_bytes,
-                timestamp=time.time(),
-                width=img.width,
-                height=img.height,
-            )
+            return self._encode_frame(img, profile="preview", source="capture")
         except Exception as e:
             logger.error(f"Frame yakalama hatası: {e}")
             return None
@@ -147,33 +189,16 @@ class ScreenCapture:
             frames = list(self._buffer)
             return frames[-count:] if len(frames) >= count else frames
 
-    def grab_now(self) -> CapturedFrame | None:
+    def grab_now(self, profile: str = "inference") -> CapturedFrame | None:
         """
         Anlık frame yakala — CPU tabanlı (PIL ImageGrab).
-        dxcam GPU kullanır ve model inference sırasında başarısız olabilir.
-        Bu method GPU'dan bağımsız çalışır, her zaman taze frame döndürür.
+        Default: inference profili (1920/Q92) — LLM inference için.
+        profile="preview" ile düşük kalite de alınabilir.
         """
         try:
             from PIL import ImageGrab
             img = ImageGrab.grab()
-
-            # Resize (LLM için optimize) — 0 = no resize
-            if self.resize_width > 0 and img.width > self.resize_width:
-                ratio = self.resize_width / img.width
-                new_height = int(img.height * ratio)
-                img = img.resize((self.resize_width, new_height), Image.LANCZOS)
-
-            # JPEG sıkıştırma -> bytes
-            buffer = io.BytesIO()
-            img.save(buffer, format="JPEG", quality=self.jpeg_quality)
-            jpeg_bytes = buffer.getvalue()
-
-            return CapturedFrame(
-                image_bytes=jpeg_bytes,
-                timestamp=time.time(),
-                width=img.width,
-                height=img.height,
-            )
+            return self._encode_frame(img, profile=profile, source="grab_now")
         except Exception as e:
             logger.error(f"CPU grab failed: {e}")
             # Fallback to ring buffer
@@ -184,15 +209,15 @@ class ScreenCapture:
 
     def pin_current_frame(self) -> CapturedFrame | None:
         """
-        Mevcut ekranı anlık yakala ve pinle.
+        Mevcut ekranı anlık yakala ve pinle — INFERENCE profili.
         Hotkey callback'inden çağrılır.
         Returns: Pinlenen frame, veya None (capture başarısızsa)
         """
-        frame = self.grab_now()
+        frame = self.grab_now(profile="inference")
         if frame:
             with self._pin_lock:
                 self._pinned_frame = frame
-            logger.info(f"📌 Ekran pinlendi ({frame.width}x{frame.height})")
+            logger.info(f"📌 Ekran pinlendi — inference ({frame.width}x{frame.height}, Q{frame.jpeg_quality})")
         return frame
 
     def get_pinned_frame(self) -> CapturedFrame | None:

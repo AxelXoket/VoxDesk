@@ -334,13 +334,18 @@ class TestProviderMessageBuilding:
         assert msgs[1]["content"] == "önceki soru"
         assert msgs[2]["content"] == "önceki cevap"
 
-    def test_visual_memo_prepended_to_content(self, provider):
+    def test_visual_memo_stored_but_not_in_content(self, provider):
+        """Part 2 mimarisi: visual_memo ChatMessage'da saklanır ama
+        content'e prefix olarak eklenmez. Text-only mode'da history
+        mesaj content'leri temiz kalır."""
         msg = provider._history.add_user_message("koduma bak")
         msg.visual_memo = "VS Code'da Python dosyası açık"
         msgs = provider._build_messages("devam")
-        assert "[Ekran Notu:" in msgs[1]["content"]
-        assert "VS Code" in msgs[1]["content"]
-        assert "koduma bak" in msgs[1]["content"]
+        # visual_memo should NOT be prepended to content
+        # (Part 2: CanonicalImageArtifact replaces the old prefix injection)
+        assert msgs[1]["content"] == "koduma bak"
+        # The memo is stored on the ChatMessage object itself
+        assert msg.visual_memo == "VS Code'da Python dosyası açık"
 
     def test_context_limit_enforced(self, provider):
         for i in range(20):

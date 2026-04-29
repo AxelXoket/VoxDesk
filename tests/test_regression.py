@@ -425,7 +425,18 @@ class TestSprint1StaticGuards:
 
     @pytest.mark.regression
     def test_voxly_refuses_harmful(self):
-        """voxly.yaml must mention refusal of harmful/unsafe requests."""
+        """voxly.yaml must mention refusal of harmful/unsafe requests.
+
+        Safety guard semantic — checks that the personality prompt contains
+        explicit safety boundary language (EN or TR).
+        """
         voxly = Path(__file__).parent.parent / "config" / "personalities" / "voxly.yaml"
         content = voxly.read_text(encoding="utf-8").lower()
-        assert "refuse" in content or "harmful" in content or "unsafe" in content
+        # English safety keywords (current prompt is English)
+        en_safety = any(w in content for w in ["refuse", "harmful", "unsafe", "illegal", "unethical"])
+        # Turkish safety keywords (if prompt is ever translated)
+        tr_safety = any(w in content for w in ["reddet", "zararlı", "güvenli değil", "yasa dışı", "tehlikeli"])
+        assert en_safety or tr_safety, (
+            "voxly.yaml must contain safety/refusal guard — "
+            "neither English nor Turkish safety keywords found"
+        )

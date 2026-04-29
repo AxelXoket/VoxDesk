@@ -1,6 +1,6 @@
 # VoxDesk Architecture — Production Reference
 
-> **Version**: v0.5.0 — Sprint 5.3: Runtime Hardening + Race Condition Fix  
+> **Version**: v0.6.0 — Sprint 5.3: Vision Pipeline + Handler Resolution + Qwen3-VL Feasibility  
 > **Runtime**: Python 3.12 + FastAPI + Uvicorn  
 > **Inference**: Local-only (Whisper STT, MarianMT Translator, Kokoro TTS, llama-cpp-python LLM)  
 > **GPU**: RTX 5080 (Blackwell, SM 12.0) — CUDA 12.8  
@@ -56,6 +56,72 @@ These tests enforce the contract automatically:
 | `test_no_cdn_script_in_frontend` | `test_voice_v2.py` | No CDN (jsdelivr, unpkg, googleapis, etc.) |
 | `test_no_runtime_model_download_in_vram_tests` | `test_phase4_integration.py` | No `from_pretrained()` in VRAM tests |
 | `test_isolation_env_guards` | `test_regression.py` | `HF_HUB_OFFLINE=1` enforced |
+
+---
+
+## Vision Handler Resolution
+
+`LlamaCppProvider` resolves the correct vision chat handler based on model filename pattern matching:
+
+### Handler Priority (First Match Wins)
+
+| Pattern Keywords | Resolved Handler | Status |
+|:---|:---|:---|
+| `gemma-4`, `gemma4`, `e4b`, `e2b` | `Gemma4ChatHandler` | ❌ Not in v0.3.21 |
+| `gemma-3`, `gemma3`, `gemma` | `Gemma3ChatHandler` | ❌ Not in v0.3.21 |
+| `qwen3-vl`, `qwen3vl`, `qwen3_vl`, `qwen3` | `Qwen3VLChatHandler` | ❌ Not in v0.3.21 (JamePeng fork only) |
+| `qwen2.5-vl`, `qwen25vl`, `qwen2_5`, `qwen` | `Qwen25VLChatHandler` | ✅ Available |
+| `minicpm` | `MiniCPMv26ChatHandler` | ✅ Available |
+| `llava` | `Llava16ChatHandler` | ✅ Available |
+
+### Explicit Override
+
+```yaml
+llm:
+  chat_handler: auto  # auto | gemma4 | gemma3 | qwen3vl | qwen25vl | minicpm | llava
+```
+
+When set to `auto` (default), the provider resolves handler from model filename. When set explicitly, the specified handler is used directly — bypasses pattern matching.
+
+### Missing Handler Policy
+
+If a handler is resolved but not available in the installed `llama-cpp-python` build, the provider:
+1. Logs a **clear warning** with the missing handler name.
+2. Falls back to auto-detect (degraded vision).
+3. **Does NOT silently substitute** another handler (e.g., Qwen25 for Qwen3).
+
+### Visual Token Budget
+
+```yaml
+llm:
+  vision_budget_preset: null  # null | screen_fast | screen_balanced | screen_ocr
+  n_ubatch: 1024              # crash guard: budget only applied if n_ubatch >= max_tokens
+```
+
+| Preset | `image_min_tokens` | `image_max_tokens` | Use Case |
+|:---|:---:|:---:|:---|
+| `screen_fast` | 64 | 256 | Quick screen glance |
+| `screen_balanced` | 256 | 768 | General screen understanding |
+| `screen_ocr` | 512 | 1536 | Dense text / small font OCR |
+
+---
+
+## Image Pipeline Quality
+
+### Dual Quality Path
+
+| Path | Resolution | Quality | Purpose |
+|:---|:---:|:---:|:---|
+| Preview (`ws_screen`) | 1280px max | Q85 | WebSocket live preview |
+| Inference (`grab_now`, `pinned_frame`, `voice_screen`) | 1920px max | Q92 | LLM vision input |
+| Upload (user-provided) | Original | Original | Never recompressed |
+
+### CanonicalImageArtifact
+
+All image sources pass through `CanonicalImageArtifact` before reaching the LLM:
+- Uniform interface for `ws_screen`, `pinned_frame`, `grab_now`, and `upload`.
+- Image history stores only references — **no raw/base64 in conversation history**.
+- `ImageMetadata` tracks source, resolution, format, byte size, and content hash.
 
 ---
 
@@ -349,6 +415,9 @@ python -m pytest tests/test_audio_protocol.py -v
 | `regression` | ~83 | Privacy, isolation, config mapping, endpoint contracts, prompt safety, audit fixes |
 | `benchmark` | 4 | Performance baselines |
 | `gpu` | 1 | GPU smoke (skipped if no CUDA) |
+| (handler/budget) | 39 | Vision handler resolution + budget plumbing |
+| (quality parity) | 16 | Image quality pipeline |
+| (image metadata) | ~20 | CanonicalImageArtifact + ImageMetadata |
 
 ### Coverage
 

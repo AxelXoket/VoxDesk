@@ -255,6 +255,9 @@ async def _process_audio_buffer(
 
     # LLM — async, non-blocking
     # Voice mode = text-only (ekran analizi sadece chat pipeline'da)
+    # TODO(Part 1.5): voice_v2 binary path currently sends image_bytes=None.
+    #   Voice+Screen support is only present in legacy ws_voice path (chat.py).
+    #   Fix via InteractionOrchestrator or shared image resolver in Sprint 5.4+.
     try:
         if state.llm is None:
             raise RuntimeError("LLM unavailable — local model file missing")

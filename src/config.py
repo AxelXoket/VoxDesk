@@ -20,8 +20,30 @@ class CaptureConfig(BaseModel):
     backend: str = "dxcam"
     interval_seconds: float = 1.0
     buffer_size: int = 30
-    jpeg_quality: int = 85
-    resize_width: int = 1920
+    jpeg_quality: int = 85           # Legacy default — preview fallback
+    resize_width: int = 1920         # Legacy default — preview fallback
+
+    # Part 3: Preview / Inference quality profiles
+    preview_resize_width: int | None = None     # None → fallback to resize_width
+    preview_jpeg_quality: int | None = None      # None → fallback to jpeg_quality
+    inference_resize_width: int | None = None    # None → fallback to resize_width
+    inference_jpeg_quality: int | None = None     # None → fallback to jpeg_quality
+
+    @property
+    def effective_preview_resize_width(self) -> int:
+        return self.preview_resize_width if self.preview_resize_width is not None else self.resize_width
+
+    @property
+    def effective_preview_jpeg_quality(self) -> int:
+        return self.preview_jpeg_quality if self.preview_jpeg_quality is not None else self.jpeg_quality
+
+    @property
+    def effective_inference_resize_width(self) -> int:
+        return self.inference_resize_width if self.inference_resize_width is not None else self.resize_width
+
+    @property
+    def effective_inference_jpeg_quality(self) -> int:
+        return self.inference_jpeg_quality if self.inference_jpeg_quality is not None else self.jpeg_quality
 
 
 class LLMConfig(BaseModel):
@@ -39,7 +61,15 @@ class LLMConfig(BaseModel):
     # llama-cpp-python specific
     n_gpu_layers: int = -1        # -1 = full GPU offload
     n_ctx: int = 8192             # context window
+    n_ubatch: int | None = None   # Part 4b: None = binding default; set ≥ image_max_tokens for budget
     chat_format: str | None = None  # None = auto-detect from model
+
+    # Part 4b: Vision handler selection
+    chat_handler: str = "auto"    # auto | gemma4 | gemma3 | qwen3vl | qwen25vl | minicpm | llava
+    enable_thinking: bool = False  # Gemma 4 reasoning mode (default off for lower latency)
+
+    # Part 4b: Vision budget (default null = disabled, no production change)
+    vision_budget_preset: str | None = None  # null | screen_fast | screen_balanced | screen_ocr
 
     # Shared inference params
     temperature: float = 0.7
@@ -154,6 +184,7 @@ class FeaturesConfig(BaseModel):
     enable_audioworklet: bool = False
     enable_mediarecorder_fallback: bool = True
     enable_debug_metrics: bool = False
+    enable_debug_capture_export: bool = False  # Part 1.5: debug frame export
 
 
 class SecurityConfig(BaseModel):
