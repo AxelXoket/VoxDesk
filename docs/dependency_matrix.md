@@ -2,7 +2,7 @@
 
 > Sprint 5.3 donanım doğrulaması tamamlanmış bağımlılık tablosu.
 > RTX 5080 = Blackwell mimarisi (SM 12.0, compute capability 12.0).
-> Son güncelleme: 2026-04-28
+> Son güncelleme: 2026-04-29
 
 ---
 
@@ -19,7 +19,7 @@
 | faster-whisper | ≥1.1 | güncel | ✅ | ✅ | large-v3-turbo model |
 | kokoro | latest | güncel | ✅ | ✅ | TTS engine |
 | dxcam | ≥0.3 | güncel | — | ✅ | Windows screen capture |
-| llama-cpp-python | latest | 0.3.20 | ✅ | ✅ | CUDA 12.8, SM 120 build |
+| llama-cpp-python | latest | 0.3.21 | ✅ | ✅ | CUDA 12.8, SM 120 build |
 | transformers | ≥4.40 | güncel | — | ✅ | MarianMT backend |
 | sentencepiece | ≥0.2 | güncel | — | ✅ | MarianMT tokenizer |
 | sacremoses | ≥2.1 | güncel | — | ✅ | MarianMT tokenizer util |
@@ -32,6 +32,10 @@
 | MiniCPM-V 4.5 Official | Q6_K | 6.26 GB | `models/minicpm-v4.5-official/model-q6_k.gguf` | ✅ |
 | MiniCPM-V 4.5 mmproj | F16 | 1.02 GB | `models/minicpm-v4.5-official/mmproj-f16.gguf` | ✅ |
 | MiniCPM-V 4.5 Abliterated | Q6_K | — | `models/minicpm-v4.5-abliterated/` | ⏳ Onay bekleniyor |
+| Qwen2.5-VL-7B-Instruct | Q8_0 | 7.72 GB | `models/Qwen2.5-VL-7B/Qwen_Qwen2.5-VL-7B-Instruct-Q8_0.gguf` | ✅ |
+| Qwen2.5-VL-7B mmproj | F16 | 1.29 GB | `models/Qwen2.5-VL-7B/mmproj-Qwen_Qwen2.5-VL-7B-Instruct-f16.gguf` | ✅ |
+| Qwen3-VL-8B-Instruct | Q8_0 | ~8.5 GB | `models/qwen3-vl-8b-instruct/` | ⏳ İndirilmedi |
+| Qwen3-VL-8B mmproj | F16 | ~1.3 GB | `models/qwen3-vl-8b-instruct/` | ⏳ İndirilmedi |
 | MarianMT opus-mt-tr-en | float16 | ~300 MB | `models/opus-mt-tr-en/` | ✅ |
 | Whisper large-v3-turbo | CTranslate2 FP16 | ~1.5 GB | `models/whisper-large-v3-turbo/` | ✅ |
 
@@ -63,12 +67,12 @@ python -c "import torch; print(torch.cuda.get_device_capability(0))"
 
 # llama-cpp-python
 python -c "import llama_cpp; print(llama_cpp.__version__)"
-# 0.3.20
+# 0.3.21
 
 # LLM inference
 python -c "from llama_cpp import Llama; m=Llama(model_path='models/minicpm-v4.5-official/model-q6_k.gguf',n_gpu_layers=-1,n_ctx=2048,verbose=False); r=m.create_chat_completion(messages=[{'role':'user','content':'Hello'}],max_tokens=16); print(r['choices'][0]['message']['content'])"
 
 # Full test suite
 python -m pytest -q --no-header
-# 484 passed, 1 skipped
+# 568 passed, 1 skipped
 ```

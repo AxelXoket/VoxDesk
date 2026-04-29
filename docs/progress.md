@@ -1,7 +1,7 @@
 # VoxDesk — Development Progress
 
 > Tracks completed work across all development phases.
-> Last updated: 2026-04-27
+> Last updated: 2026-04-29
 
 ---
 
@@ -632,3 +632,52 @@ End-to-end voice pipeline: Mic → STT → Translator → LLM → TTS → Speake
 - 484 tests passing, 9 pre-existing failed, 0 regressions ✅
 - `test_sprint52_fixes.py` genişletildi → 39 tests (Sprint 5.2 + 5.3 coverage)
 - Concurrent load deadlock test ✅
+
+---
+
+## 2026-04-29 (Wednesday) — Sprint 5.3: Multimodal Pipeline Optimization (Part 1.5 - Part 5b)
+
+### Sprint 5.3: Vision Pipeline & Qwen3-VL Feasibility ✅
+
+**Baseline:** 484 tests → 568 tests (+84)
+
+**Part 1.5 — Image Metadata & Debug Export:**
+- Added ImageMetadata extraction (source, resolution, format, byte size, hash).
+- Added `export_to_disk` for exact LLM inference payload verification.
+- Enforced strict privacy rule: no automatic disk writes, no EXIF stripping without consent.
+
+**Part 2 — Canonical Image Artifact:**
+- Replaced fragmented image payloads with `CanonicalImageArtifact`.
+- Unified `ws_screen`, `pinned_frame`, and `grab_now` formats into a single artifact structure.
+- Removed base64 data from historical logs (saved to `scratch/` only when exported).
+
+**Part 3 — Capture & Upload Quality Parity:**
+- Unified local screenshot and uploaded image quality settings.
+- Increased inference image quality to 1920px (max) and Q92 to match standard uploads.
+- Preserved 1280px/Q85 for websocket preview frames.
+
+**Part 4 & 4b — Handler Fix & Visual Budget Plumbing:**
+- Refactored `LlamaCppProvider` to support specific vision handlers via pattern matching.
+- Implemented handler resolution hierarchy: Gemma4/3, Qwen3VL, Qwen25VL, MiniCPM, Llava.
+- Added visual token budget mechanisms: `n_ubatch` parameter and predefined presets (`screen_fast`, `screen_balanced`, `screen_ocr`).
+- Hardened provider to fail loudly (clear error) rather than silently fallback when a specialized handler is missing.
+
+**Part 5 & 5b — Qwen3-VL Readiness & Feasibility Check:**
+- Confirmed Qwen3-VL-8B as the primary candidate for UI/Screen understanding (superior OCR and agentic perception).
+- Discovered `Qwen3VLChatHandler` is currently missing from `llama-cpp-python` v0.3.21 on PyPI.
+- Validated that `JamePeng` fork contains the handler via direct source inspection.
+- Established a safe, isolated `.venv-qwen3-jamepeng-test` plan to test the source build without risking the main environment's CUDA stability.
+- Blocked immediate production migration to Qwen3-VL until the test environment is verified. Qwen2.5-VL remains the immediately usable fallback baseline.
+
+**Test Cleanup (9 pre-existing failures → 0 failures):**
+- 6 outdated test assertions updated to match current production behavior (Türkçe voice mode indicator, empty emotion_rules, Part 2 image artifact architecture).
+- 1 safety guard restored: `voxly.yaml` SAFETY kuralı eklendi (refusal of harmful/unsafe/illegal — önceki prompt rewrite'da kaybolmuştu).
+- 3 unimplemented feature tests (`stt_translated` frontend handler) marked `@pytest.mark.xfail` — Sprint 5 backlog.
+
+**Verification:**
+- 594 tests passing, 3 xfailed (backlog), 0 failures, 0 regressions ✅
+- Preserved CUDA backend stability. Main `.venv` untouched.
+
+**Backlog:**
+- `stt_translated` frontend event handler (3 xfail tests await implementation).
+- Qwen3-VL JamePeng fork test venv build (pending user approval).

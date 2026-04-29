@@ -8,8 +8,16 @@ app:
 capture:
   interval_seconds: 1.0
   buffer_size: 30        # Last 30 frames (ring buffer)
-  jpeg_quality: 85          # Good balance for text/code readability
-  resize_width: 1280        # Resize from native 2560px — faster inference, less context usage
+  jpeg_quality: 85          # Legacy default (preview fallback)
+  resize_width: 1280        # Legacy default (preview fallback)
+
+  # Part 3: Preview path — screen websocket / frontend preview
+  preview_resize_width: 1280
+  preview_jpeg_quality: 85
+
+  # Part 3: Inference path — LLM image input (matches upload 1920/Q92)
+  inference_resize_width: 1920
+  inference_jpeg_quality: 92
 
 llm:
   provider: "llama-cpp"
@@ -73,6 +81,7 @@ features:
   enable_audioworklet: false
   enable_mediarecorder_fallback: true
   enable_debug_metrics: false
+  enable_debug_capture_export: false    # Part 1.5: image debug frame export
 
 network:
   bind_host: "127.0.0.1"

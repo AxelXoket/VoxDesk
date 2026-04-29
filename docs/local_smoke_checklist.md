@@ -1,6 +1,6 @@
 # VoxDesk — Local Smoke Checklist
 
-> Sprint 5.3 kurulum sonrası gerçek donanımda doğrulanmış maddeler.
+> Sprint 5.3 (Part 5b) kurulum sonrası gerçek donanımda doğrulanmış maddeler.
 > Bu çalıştırma kodu DEĞİL, manual verification listesidir.
 
 ---
@@ -34,6 +34,15 @@
 - [ ] STT: 1 saniyelik sessizlik transcribe → empty result veya short text
 - [x] llama-cpp-python model load (MiniCPM-V 4.5 Q6_K) → inference OK
 - [x] mmproj load (F16) → vision projector mevcut
+
+## 3b. Vision Handler Smoke
+
+- [ ] Handler resolution: model filename → correct handler class (Qwen25VL, MiniCPM, etc.)
+- [ ] Explicit `chat_handler: qwen25vl` override → correct handler used
+- [ ] Missing handler (Qwen3, Gemma4) → clear warning logged, no silent fallback
+- [ ] Inference image quality → 1920px max, Q92 (not preview 1280/Q85)
+- [ ] CanonicalImageArtifact → image metadata (source, resolution, hash) logged correctly
+- [ ] No base64/raw image data in conversation history
 
 ## 4. Screen Capture Smoke
 
@@ -82,3 +91,11 @@
 
 ALL items checked → Sprint 5.3 ready.
 ANY unchecked → document issue, assess impact, fix or accept known limitation before proceeding.
+
+---
+
+## Known Limitations (Sprint 5.3)
+
+- `Qwen3VLChatHandler` not available in `llama-cpp-python` v0.3.21 (requires JamePeng fork or upstream update).
+- `Gemma4ChatHandler` / `Gemma3ChatHandler` not available in v0.3.21.
+- POST `/chat` still uses ring buffer quality (1280/Q85) — low priority.

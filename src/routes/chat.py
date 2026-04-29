@@ -43,20 +43,21 @@ async def chat(request: ChatRequest):
             has_image=False,
         )
 
-    image_bytes = None
+    image_artifact = None
 
     if request.include_screen and state.capture:
         frame = state.capture.get_latest_frame()
         if frame:
-            image_bytes = frame.image_bytes
+            from src.image_artifact import build_artifact_from_frame
+            image_artifact = build_artifact_from_frame(frame)
 
     # Async chat — event loop'u bloke etmez
-    response_text = await state.llm.chat(request.message, image_bytes)
+    response_text = await state.llm.chat(request.message, image_artifact=image_artifact)
 
     return ChatResponse(
         response=response_text,
         model=state.llm.model_name,
-        has_image=image_bytes is not None,
+        has_image=image_artifact is not None,
     )
 
 
@@ -78,7 +79,7 @@ async def ws_chat(websocket: WebSocket):
             attachments = data.get("attachments", [])
 
             # ── Image priority: attachment > pinned frame > always-on screen ──
-            image_bytes = None
+            image_artifact = None
 
             # 1. User attachment (file upload, drag & drop, paste)
             if attachments:
@@ -88,25 +89,38 @@ async def ws_chat(websocket: WebSocket):
                     # Strip data URI prefix if present (e.g., "data:image/jpeg;base64,...")
                     if "," in att_data:
                         att_data = att_data.split(",", 1)[1]
-                    image_bytes = base64.b64decode(att_data)
-                    logger.info(f"📎 User attachment received ({len(image_bytes)} bytes)")
+                    raw_bytes = base64.b64decode(att_data)
+                    from src.image_artifact import build_artifact_from_upload, ImageValidationError
+                    image_artifact = build_artifact_from_upload(raw_bytes, jpeg_quality=92)
+                    logger.info(f"📎 Upload artifact created ({image_artifact.metadata.byte_size} bytes)")
+                except ImageValidationError as val_err:
+                    logger.warning(f"Upload validation failed: {val_err}")
+                    await state.ws_manager.send_json(websocket, {
+                        "type": "error",
+                        "code": val_err.code,
+                        "message": f"Image validation failed: {val_err}",
+                        "recoverable": True,
+                    })
+                    continue
                 except Exception as att_err:
                     logger.error(f"Attachment decode error: {att_err}")
 
             # 2. Pinned frame (hotkey capture — sekme değişmeden önce alınmış)
-            if image_bytes is None and state.capture and state.capture.has_pin:
+            if image_artifact is None and state.capture and state.capture.has_pin:
                 frame = state.capture.get_pinned_frame()
                 if frame:
-                    image_bytes = frame.image_bytes
+                    from src.image_artifact import build_artifact_from_frame
+                    image_artifact = build_artifact_from_frame(frame, source_override="pinned_frame")
                     state.capture.clear_pin()
-                    logger.info("📌 Using pinned frame")
+                    logger.info("📌 Pinned frame artifact created")
 
             # 3. Always-on screen capture — anlık canlı frame (stale buffer değil)
-            if image_bytes is None and include_screen and state.capture:
+            if image_artifact is None and include_screen and state.capture:
                 frame = state.capture.grab_now()
                 if frame:
-                    image_bytes = frame.image_bytes
-                    logger.info(f"📸 Live frame captured ({frame.width}x{frame.height})")
+                    from src.image_artifact import build_artifact_from_frame
+                    image_artifact = build_artifact_from_frame(frame)
+                    logger.info(f"📸 Live frame artifact ({frame.width}x{frame.height})")
 
             if state.llm is None:
                 await state.ws_manager.send_json(websocket, {
@@ -124,7 +138,7 @@ async def ws_chat(websocket: WebSocket):
 
             full_response = []
             try:
-                async for token in state.llm.chat_stream(message, image_bytes):
+                async for token in state.llm.chat_stream(message, image_artifact=image_artifact):
                     full_response.append(token)
                     await state.ws_manager.send_json(websocket, {
                         "type": "token",
@@ -267,12 +281,13 @@ async def ws_voice(websocket: WebSocket):
                 llm_input = text
 
                 # 3. Screen capture — voice mode'da da ekranı gör
-                voice_image_bytes = None
+                voice_artifact = None
                 if state.capture:
                     frame = state.capture.grab_now()
                     if frame:
-                        voice_image_bytes = frame.image_bytes
-                        logger.info(f"🎤📸 Voice: live frame captured ({frame.width}x{frame.height})")
+                        from src.image_artifact import build_artifact_from_frame
+                        voice_artifact = build_artifact_from_frame(frame, source_override="voice_screen")
+                        logger.info(f"🎤📸 Voice: frame artifact ({frame.width}x{frame.height})")
 
                 if state.llm is None:
                     await state.ws_manager.send_json(websocket, {
@@ -283,7 +298,7 @@ async def ws_voice(websocket: WebSocket):
                     })
                     continue
 
-                llm_response = await state.llm.chat(llm_input, image_bytes=voice_image_bytes, response_mode="voice")
+                llm_response = await state.llm.chat(llm_input, response_mode="voice", image_artifact=voice_artifact)
 
                 await state.ws_manager.send_json(websocket, {
                     "type": "llm_response",
