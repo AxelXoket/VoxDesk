@@ -74,5 +74,5 @@ python -c "from llama_cpp import Llama; m=Llama(model_path='models/minicpm-v4.5-
 
 # Full test suite
 python -m pytest -q --no-header
-# 568 passed, 1 skipped
+# 597 passed, 0 skipped
 ```

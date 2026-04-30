@@ -411,13 +411,13 @@ python -m pytest tests/test_audio_protocol.py -v
 
 | Marker | Count | Purpose |
 |:---|:---:|:---|
-| `unit` | ~175 | Core logic |
-| `regression` | ~83 | Privacy, isolation, config mapping, endpoint contracts, prompt safety, audit fixes |
+| `unit` | 183 | Core logic |
+| `regression` | 84 | Privacy, isolation, config mapping, endpoint contracts, prompt safety, audit fixes |
 | `benchmark` | 4 | Performance baselines |
 | `gpu` | 1 | GPU smoke (skipped if no CUDA) |
 | (handler/budget) | 39 | Vision handler resolution + budget plumbing |
 | (quality parity) | 16 | Image quality pipeline |
-| (image metadata) | ~20 | CanonicalImageArtifact + ImageMetadata |
+| (image metadata) | 24 | CanonicalImageArtifact + ImageMetadata |
 
 ### Coverage
 
