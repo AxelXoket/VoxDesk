@@ -1,11 +1,133 @@
 # VoxDesk Architecture — Production Reference
 
-> **Version**: v0.6.0 — Sprint 5.3: Vision Pipeline + Handler Resolution + Qwen3-VL Feasibility  
-> **Runtime**: Python 3.12 + FastAPI + Uvicorn  
-> **Inference**: Local-only (Whisper STT, MarianMT Translator, Kokoro TTS, llama-cpp-python LLM)  
-> **GPU**: RTX 5080 (Blackwell, SM 12.0) — CUDA 12.8  
-> **Audio**: PCM binary WebSocket (v1) + legacy base64 fallback  
-> **Voice Pipeline**: Mic → STT (auto-detect TR/EN) → Translator (TR→EN) → LLM (EN) → TTS (EN) → Speaker
+> **Version** : v0.7.2 — Sprint 7.2 : Stabilization — FVM stuck fix, UI calm, screen prompt policy, Gemma4 default  
+> **Runtime** : Python 3.12 + FastAPI + Uvicorn  
+> **Inference** : Local-only (Whisper STT, Kokoro TTS, Gemma4 via llama-server sidecar, llama-cpp-python fallback)  
+> **GPU** : RTX 5080 (Blackwell, SM 12.0) — CUDA 12.8  
+> **Audio** : PCM binary WebSocket (v1) + legacy base64 fallback  
+> **Voice Pipeline** : Mic → STT (auto-detect TR/EN) → LLM (multilingual, screen context optional) → TTS → Speaker  
+> **Note** : Translator (MarianMT TR→EN) is available but disabled by default — LLM handles multilingual natively.
+
+---
+
+## Voice Modes (Sprint 7)
+
+> [!IMPORTANT]
+> Full Voice Mode and normal dictation are **separate, independent modes**.
+> They share the same voice_v2 WebSocket but never run simultaneously.
+
+### Architecture Overview
+
+```
+┌──────────────────────────────────────────────┐
+│               Frontend                        │
+│                                               │
+│  ┌─────────────┐    ┌───────────────────────┐ │
+│  │ Dictation    │    │ Full Voice Mode (FVM) │ │
+│  │ #btnMic      │    │ full-voice-mode.js    │ │
+│  │ Click toggle │    │ 7-state machine       │ │
+│  └──────┬───────┘    └──────────┬────────────┘ │
+│         │                       │              │
+│         └───────┬───────────────┘              │
+│                 ▼                               │
+│     ┌───────────────────┐                      │
+│     │  AudioCapture     │ ◄── onLevelUpdate    │
+│     │  audio-capture.js │     (RMS from        │
+│     └────────┬──────────┘      AudioWorklet)   │
+│              ▼                                  │
+│     ┌───────────────────┐                      │
+│     │ WebSocket         │                      │
+│     │ /api/ws/voice/v2  │                      │
+│     └────────┬──────────┘                      │
+└──────────────┼──────────────────────────────────┘
+               ▼
+┌──────────────────────────────────────────────┐
+│           Backend (voice_v2.py)               │
+│  PCM → STT → LLM (+screen context) → TTS    │
+└──────────────────────────────────────────────┘
+```
+
+### Full Voice Mode State Machine
+
+| State | Label | Behavior |
+|:------|:------|:---------|
+| `idle` | — | FVM off, chat UI visible |
+| `listening` | Dinliyorum... | Mic active, waiting for speech (RMS > threshold) |
+| `user_speaking` | Konuşuyor... | User is speaking, waveform active |
+| `silence_countdown` | Sessizlik algılandı... | RMS < threshold for up to 3s, timer running |
+| `processing` | İşleniyor... | audio_end sent, waiting for STT → LLM → TTS |
+| `ai_speaking` | Yanıt veriliyor... | TTS playback, mic RMS ignored |
+| `error` | ⚠️ [message] | Error shown, auto-recover after 2s |
+
+### Silence Detection
+
+- Threshold : `FVM_SILENCE_RMS_THRESHOLD = 0.01` (JS constant)
+- Duration : `FVM_SILENCE_DURATION_MS = 3000` (3 seconds)
+- Guard : `hasSpokeYet` — turn only closes after user has spoken at least once
+- Implementation : Frontend-only via AudioWorklet RMS reports (~21ms granularity)
+
+### Read-Aloud Endpoint
+
+| Aspect | Detail |
+|:-------|:-------|
+| Endpoint | `POST /api/tts/read` |
+| Request | `{ "text": "..." }` |
+| Success | `200 audio/wav` — WAV bytes |
+| Empty text | `400 { "error": "empty_text" }` |
+| Too long | `400 { "error": "text_too_long", "max": 2000 }` |
+| TTS off | `503 { "error": "tts_unavailable" }` |
+| Failure | `500 { "error": "synthesis_failed" }` |
+
+### TTS Playback Conflict Management
+
+Single `activeAudio` reference in `app.js` prevents simultaneous playback:
+- FVM TTS → `playAudioFromBase64()` → stops previous audio
+- Read-aloud → `playAudio()` (blob URL) → stops previous audio
+- Voice dictation TTS → `playAudio()` → stops previous audio
+
+---
+
+## Screen Context Policy (Sprint 6.1)
+
+> [!IMPORTANT]
+> Screen context is **automatic backend behavior**, not a manual user action.
+
+### Design Principles
+
+1. **Backend-driven** : The backend owns frame buffer, frame selection, artifact creation, and LLM injection
+2. **Frontend-controlled** : Frontend only controls screen context ON/OFF toggle and optional live preview
+3. **Unified across all paths** : Text chat (HTTP + WS), legacy voice, and voice_v2 binary all follow the same policy
+4. **Privacy-first** : Screen context OFF = zero image data reaches the LLM
+
+### Request-Time Frame Selection
+
+| Path | Endpoint | Frame Selector | Artifact Builder |
+|------|----------|---------------|------------------|
+| HTTP chat | `POST /api/chat` | `get_best_frame()` | `build_artifact_from_frame()` |
+| WS chat | `GET /api/ws/chat` | `get_best_frame()` | `build_artifact_from_frame()` |
+| Legacy voice | `GET /api/ws/voice` | `get_best_frame()` | `build_artifact_from_frame()` |
+| Voice v2 binary | `GET /api/ws/voice/v2` | `get_best_frame()` | `build_artifact_from_frame()` |
+| Voice v2 legacy | `GET /api/ws/voice/v2` (fallback) | `get_best_frame()` | `build_artifact_from_frame()` |
+
+### Frame Selection Priority
+
+`get_best_frame()` → pin > ring buffer latest > None
+
+- **Pin** : User hotkey (Ctrl+Shift+S) captures inference-quality frame, consumed once
+- **Ring buffer** : Preview-quality frames from dxcam capture loop (1s interval)
+- **grab_now()** : Explicit immediate capture (dxcam-first, PIL fallback) — reserved for pin/hotkey
+
+### Frontend Behavior
+
+- Screen context toggle : ON by default (`alwaysOnToggle`)
+- No manual screenshot attachment — upload/drag-drop/paste flow removed
+- Live preview sidebar shows capture status
+- Pin indicator shows when a pinned frame will be used
+
+### Backlog
+
+- Temporal multi-frame selection (long-message start/end frame) — future sprint
+- Input lifecycle tracking (`input_started_at`, `typing_duration`) — future sprint
 
 ---
 
@@ -59,36 +181,52 @@ These tests enforce the contract automatically:
 
 ---
 
-## Vision Handler Resolution
+## LLM Providers
 
-`LlamaCppProvider` resolves the correct vision chat handler based on model filename pattern matching:
+### Primary: `local-llama-server` (Gemma4 Sidecar)
+
+The default LLM provider runs a **local llama-server subprocess** (sidecar):
+
+| Property | Value |
+|:---------|:------|
+| Provider class | `LocalLlamaServerProvider` |
+| Transport | `httpx` → `http://127.0.0.1:<port>` only |
+| Protocol | OpenAI-compatible `/v1/chat/completions` — **local API format only, not OpenAI cloud** |
+| Vision | `image_url` with `data:image/jpeg;base64,...` payload via libmtmd/mmproj |
+| Lifecycle | `SidecarManager` — auto-start, health-check, graceful shutdown |
+| Handler blocker | `Gemma4ChatHandler` is **not needed** — sidecar uses libmtmd natively |
+| Security | Remote URLs rejected at constructor time (`ValueError`) |
+| Logging | Base64 image data **never logged** — only metadata (size, source, endpoint) |
+
+**Config** (`config/default.yaml`):
+```yaml
+llm:
+  provider: "local-llama-server"
+local_llama_server:
+  enabled: true
+  base_url: "http://127.0.0.1:8081"
+  model_path: "models/gemma-4-E4B-uncensored/...Q8_K_P.gguf"
+  mmproj_path: "models/gemma-4-E4B-uncensored/...f16.gguf"
+  jinja: true        # required for Gemma4 chat template
+  auto_start: true
+```
+
+### Fallback: `llama-cpp` (In-Process)
+
+`LlamaCppProvider` loads models in-process via llama-cpp-python with automatic vision handler resolution:
 
 ### Handler Priority (First Match Wins)
 
 | Pattern Keywords | Resolved Handler | Status |
 |:---|:---|:---|
-| `gemma-4`, `gemma4`, `e4b`, `e2b` | `Gemma4ChatHandler` | ❌ Not in v0.3.21 |
-| `gemma-3`, `gemma3`, `gemma` | `Gemma3ChatHandler` | ❌ Not in v0.3.21 |
-| `qwen3-vl`, `qwen3vl`, `qwen3_vl`, `qwen3` | `Qwen3VLChatHandler` | ❌ Not in v0.3.21 (JamePeng fork only) |
-| `qwen2.5-vl`, `qwen25vl`, `qwen2_5`, `qwen` | `Qwen25VLChatHandler` | ✅ Available |
+| `qwen2.5-vl`, `qwen25vl`, `qwen` | `Qwen25VLChatHandler` | ✅ Available |
 | `minicpm` | `MiniCPMv26ChatHandler` | ✅ Available |
 | `llava` | `Llava16ChatHandler` | ✅ Available |
+| `gemma-4`, `gemma4`, `e4b`, `e2b` | `Gemma4ChatHandler` | ❌ Not in v0.3.21 |
+| `gemma-3`, `gemma3`, `gemma` | `Gemma3ChatHandler` | ❌ Not in v0.3.21 |
+| `qwen3-vl`, `qwen3vl` | `Qwen3VLChatHandler` | ❌ JamePeng fork only |
 
-### Explicit Override
-
-```yaml
-llm:
-  chat_handler: auto  # auto | gemma4 | gemma3 | qwen3vl | qwen25vl | minicpm | llava
-```
-
-When set to `auto` (default), the provider resolves handler from model filename. When set explicitly, the specified handler is used directly — bypasses pattern matching.
-
-### Missing Handler Policy
-
-If a handler is resolved but not available in the installed `llama-cpp-python` build, the provider:
-1. Logs a **clear warning** with the missing handler name.
-2. Falls back to auto-detect (degraded vision).
-3. **Does NOT silently substitute** another handler (e.g., Qwen25 for Qwen3).
+> **Note**: Gemma4 vision is fully operational via the sidecar provider. The missing `Gemma4ChatHandler` in llama-cpp-python is **no longer a blocker**.
 
 ### Visual Token Budget
 
@@ -100,9 +238,9 @@ llm:
 
 | Preset | `image_min_tokens` | `image_max_tokens` | Use Case |
 |:---|:---:|:---:|:---|
-| `screen_fast` | 64 | 256 | Quick screen glance |
-| `screen_balanced` | 256 | 768 | General screen understanding |
-| `screen_ocr` | 512 | 1536 | Dense text / small font OCR |
+| `screen_fast` | 280 | 280 | Quick screen glance |
+| `screen_balanced` | 560 | 560 | General screen understanding |
+| `screen_ocr` | 1120 | 1120 | Dense text / small font OCR |
 
 ---
 
@@ -308,11 +446,12 @@ All flags are **restart-only** (no runtime toggle):
 | Flag | Default | Description |
 |:---|:---:|:---|
 | `enable_module_registry` | `true` | DI registry |
-| `enable_vram_unload` | `false` | Idle model unload |
+| `enable_vram_unload` | `true` | Idle model unload |
 | `enable_binary_audio` | `false` | Binary PCM transfer |
 | `enable_audioworklet` | `false` | AudioWorklet capture |
 | `enable_mediarecorder_fallback` | `true` | MediaRecorder fallback |
 | `enable_debug_metrics` | `false` | `/api/debug/metrics` (returns 403 when disabled) |
+| `enable_debug_capture_export` | `false` | Write LLM-bound image bytes to `data/debug_frames/` (dev only) |
 
 > **Note**: VRAM monitor only starts when `enable_vram_unload` is `true`. When `false`, `VRAMManager` is still created for reporting but the idle-unload background task does not run.
 
@@ -327,7 +466,7 @@ Minimal, safe to expose. **No** model names, paths, VRAM, or registry info.
 ```json
 {
   "status": "ok",
-  "version": "0.5.0",
+  "version": "0.7.2",
   "uptime_seconds": 42.5,
   "degraded": false
 }
@@ -341,7 +480,7 @@ Safe runtime snapshot with model states, capture status, connections, and featur
 {
   "api": {
     "status": "ok",
-    "version": "0.5.0",
+    "version": "0.7.2",
     "uptime_seconds": 42.5,
     "degraded": false
   },
@@ -349,6 +488,7 @@ Safe runtime snapshot with model states, capture status, connections, and featur
     "running": true,
     "latest_frame_age_ms": 80
   },
+  "screen_context_enabled": true,
   "connections": {
     "chat": { "count": 1, "state": "connected" },
     "screen": { "count": 1, "state": "connected" },
@@ -357,18 +497,29 @@ Safe runtime snapshot with model states, capture status, connections, and featur
   },
   "models": {
     "stt": { "name": "large-v3-turbo", "state": "LOADED" },
-    "llm": { "name": "MiniCPM-V-4.5-Q6_K", "state": "LOADED" },
-    "tts": { "name": "af_heart", "state": "UNLOADED" }
+    "llm": { "name": "Gemma-4-E4B-Uncensored-HauhauCS-Aggressive-Q8_K_P.gguf", "state": "LOADED" },
+    "tts": { "name": "af_heart", "state": "UNLOADED" },
+    "translator": { "name": null, "state": "UNAVAILABLE" }
+  },
+  "llm_provider": {
+    "provider": "local-llama-server",
+    "has_vision": true,
+    "server_available": true
+  },
+  "sidecar": {
+    "running": true,
+    "healthy": true
   },
   "features": {
     "enable_module_registry": true,
-    "enable_vram_unload": false,
+    "enable_vram_unload": true,
     "enable_binary_audio": false,
     "enable_audioworklet": false,
     "enable_mediarecorder_fallback": true,
     "enable_debug_metrics": false
   },
-  "last_error": null
+  "last_error": null,
+  "last_error_time": null
 }
 ```
 
@@ -409,15 +560,17 @@ python -m pytest tests/test_audio_protocol.py -v
 
 ### Test Categories
 
-| Marker | Count | Purpose |
+| Marker | Count (approx.) | Purpose |
 |:---|:---:|:---|
-| `unit` | 183 | Core logic |
-| `regression` | 84 | Privacy, isolation, config mapping, endpoint contracts, prompt safety, audit fixes |
+| `unit` | ~180+ | Core logic |
+| `regression` | ~85+ | Privacy, isolation, config mapping, endpoint contracts, prompt safety, audit fixes |
 | `benchmark` | 4 | Performance baselines |
 | `gpu` | 1 | GPU smoke (skipped if no CUDA) |
-| (handler/budget) | 39 | Vision handler resolution + budget plumbing |
-| (quality parity) | 16 | Image quality pipeline |
-| (image metadata) | 24 | CanonicalImageArtifact + ImageMetadata |
+| (handler/budget) | ~40 | Vision handler resolution + budget plumbing |
+| (quality parity) | ~16 | Image quality pipeline |
+| (image metadata) | ~24 | CanonicalImageArtifact + ImageMetadata |
+
+> **Note**: Test counts are approximate and grow with each sprint. Run `pytest --co -q` for exact current count.
 
 ### Coverage
 

@@ -72,12 +72,51 @@ class LLMConfig(BaseModel):
     vision_budget_preset: str | None = None  # null | screen_fast | screen_balanced | screen_ocr
 
     # Shared inference params
-    temperature: float = 0.7
-    max_tokens: int = 2048
-    repeat_penalty: float = 1.1     # Prevent repetition loops
+    temperature: float = 0.4
+    max_tokens: int = 512
+    repeat_penalty: float = 1.15     # Prevent repetition loops
     context_messages: int = 10
     # Sprint 3: multi-frame vision — 3D-Resampler doğrulandıktan sonra artır
     llm_frame_count: int = 1
+
+
+class LocalLlamaServerConfig(BaseModel):
+    """Config for app-managed local llama-server sidecar.
+
+    Privacy guarantee: base_url MUST be localhost-only.
+    This is enforced at validation time — remote URLs are rejected.
+
+    Dev path: Use Docker-provided llama-server.exe
+    Prod path: Bundled llama-server.exe next to VoxDesk.exe
+    """
+    model_config = ConfigDict(extra='forbid')
+
+    enabled: bool = False                 # Master switch — disabled until configured
+    executable_path: str = ""             # Path to llama-server.exe (dev: Docker path)
+    base_url: str = "http://127.0.0.1:8081"   # Local-only API endpoint
+    port: int = 8081                      # Sidecar listen port
+    model_path: str = ""                  # GGUF model path
+    mmproj_path: str = ""                 # Vision mmproj path
+    n_gpu_layers: int = 99               # GPU offload layers (-1 or 99 = full)
+    n_ctx: int = 8192                    # Context window
+    jinja: bool = True                   # Enable Jinja chat template (Gemma4 needs this)
+    auto_start: bool = True              # Auto-start sidecar on VoxDesk startup
+    startup_timeout_seconds: float = 60.0  # Max wait for health check
+    shutdown_timeout_seconds: float = 10.0
+
+    # Inference params
+    temperature: float = 1.0             # Gemma4 recommended: 1.0
+    top_p: float = 0.95                  # Gemma4 recommended: 0.95
+    top_k: int = 64                      # Gemma4 recommended: 64
+    max_tokens: int = 512
+    context_messages: int = 10
+
+    def validate_localhost_only(self) -> bool:
+        """Enforce localhost-only base_url. Reject all remote URLs."""
+        from urllib.parse import urlparse
+        parsed = urlparse(self.base_url)
+        hostname = parsed.hostname or ""
+        return hostname in ("127.0.0.1", "localhost", "::1")
 
 
 class TTSConfig(BaseModel):
@@ -106,7 +145,7 @@ class TranslatorConfig(BaseModel):
     engine: str = "marian"
     model_path: str = "models/opus-mt-tr-en"
     device: str = "cuda"
-    enabled: bool = True
+    enabled: bool = False  # LLM handles multilingual natively — translator dormant
 
 
 class VoiceActivationConfig(BaseModel):
@@ -125,9 +164,9 @@ class HotkeyConfig(BaseModel):
 
 class HistoryConfig(BaseModel):
     model_config = ConfigDict(extra='forbid')
-    max_messages: int = 500
-    auto_save: bool = False
-    save_path: str = "./data/history/"
+    max_messages: int = 500       # BACKLOG: Not yet wired — ConversationHistory uses MAX_HISTORY_CHARS
+    auto_save: bool = False       # BACKLOG: Not yet implemented — reserved for future sprint
+    save_path: str = "./data/history/"  # BACKLOG: Not yet implemented — reserved for future sprint
 
 
 class PersonalityConfig(BaseModel):
@@ -185,6 +224,7 @@ class FeaturesConfig(BaseModel):
     enable_mediarecorder_fallback: bool = True
     enable_debug_metrics: bool = False
     enable_debug_capture_export: bool = False  # Part 1.5: debug frame export
+    enable_full_voice_mode: bool = True         # Sprint 7: Full Voice Mode UI
 
 
 class SecurityConfig(BaseModel):
@@ -235,6 +275,7 @@ class AppConfig(BaseModel):
     security: SecurityConfig = Field(default_factory=SecurityConfig)
     vram: VRAMConfig = Field(default_factory=VRAMConfig)
     translator: TranslatorConfig = Field(default_factory=TranslatorConfig)
+    local_llama_server: LocalLlamaServerConfig = Field(default_factory=LocalLlamaServerConfig)
 
 
 def load_personality(name: str) -> PersonalityConfig:
@@ -279,6 +320,7 @@ def load_config() -> AppConfig:
             "security": raw.get("security", {}),
             "vram": raw.get("vram", {}),
             "translator": raw.get("translator", {}),
+            "local_llama_server": raw.get("local_llama_server", {}),
         }
 
     config = AppConfig(**config_data)

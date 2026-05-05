@@ -11,11 +11,15 @@ import base64
 import logging
 import asyncio
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 
 logger = logging.getLogger("voxdesk.routes.chat")
 
 router = APIRouter(prefix="/api", tags=["chat"])
+
+# ── TTS Read-Aloud Constants ─────────────────────────────────
+MAX_TTS_READ_CHARS = 2000
 
 
 class ChatRequest(BaseModel):
@@ -27,6 +31,66 @@ class ChatResponse(BaseModel):
     response: str
     model: str | None = None
     has_image: bool = False
+
+
+class TTSReadRequest(BaseModel):
+    text: str
+
+
+@router.post("/tts/read")
+async def tts_read(request: TTSReadRequest):
+    """
+    Read-aloud endpoint — text'i TTS ile sese çevirir.
+    Sprint 7 : Normal chat'te assistant mesajlarını sesli okumak için.
+    Global TTS config'i mutate etmez.
+    """
+    from src.main import get_app_state
+
+    state = get_app_state()
+
+    # Validation
+    if not request.text or not request.text.strip():
+        return JSONResponse(
+            status_code=400,
+            content={"error": "empty_text"},
+        )
+
+    if len(request.text) > MAX_TTS_READ_CHARS:
+        return JSONResponse(
+            status_code=400,
+            content={"error": "text_too_long", "max": MAX_TTS_READ_CHARS},
+        )
+
+    # TTS availability
+    if state.tts is None or not state.tts.enabled:
+        return JSONResponse(
+            status_code=503,
+            content={"error": "tts_unavailable"},
+        )
+
+    # Synthesize in executor (non-blocking)
+    loop = asyncio.get_running_loop()
+    try:
+        wav_bytes = await loop.run_in_executor(
+            None, state.tts.synthesize, request.text.strip()
+        )
+    except Exception as e:
+        logger.error(f"TTS read-aloud error : {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"error": "synthesis_failed"},
+        )
+
+    if wav_bytes is None:
+        return JSONResponse(
+            status_code=500,
+            content={"error": "synthesis_failed"},
+        )
+
+    return Response(
+        content=wav_bytes,
+        media_type="audio/wav",
+    )
 
 
 @router.post("/chat", response_model=ChatResponse)
@@ -46,7 +110,7 @@ async def chat(request: ChatRequest):
     image_artifact = None
 
     if request.include_screen and state.capture:
-        frame = state.capture.get_latest_frame()
+        frame = state.capture.get_best_frame()
         if frame:
             from src.image_artifact import build_artifact_from_frame
             image_artifact = build_artifact_from_frame(frame)
@@ -114,13 +178,14 @@ async def ws_chat(websocket: WebSocket):
                     state.capture.clear_pin()
                     logger.info("📌 Pinned frame artifact created")
 
-            # 3. Always-on screen capture — anlık canlı frame (stale buffer değil)
-            if image_artifact is None and include_screen and state.capture:
-                frame = state.capture.grab_now()
+            # 3. Always-on screen capture — get_best_frame() (pin > ring buffer)
+            # Sprint 8.1: Use declared AppState field
+            if image_artifact is None and include_screen and state.screen_context_enabled and state.capture:
+                frame = state.capture.get_best_frame()
                 if frame:
                     from src.image_artifact import build_artifact_from_frame
                     image_artifact = build_artifact_from_frame(frame)
-                    logger.info(f"📸 Live frame artifact ({frame.width}x{frame.height})")
+                    logger.info(f"📸 Screen context: {frame.source} ({frame.width}x{frame.height})")
 
             if state.llm is None:
                 await state.ws_manager.send_json(websocket, {
@@ -181,7 +246,8 @@ async def ws_screen(websocket: WebSocket):
 
     try:
         while True:
-            if state.capture:
+            # Sprint 8.1: Honor runtime screen toggle — declared AppState field
+            if state.capture and state.screen_context_enabled:
                 frame = state.capture.get_latest_frame()
                 # Sadece yeni frame varsa gönder (duplicate skip)
                 if frame and frame.timestamp > _last_frame_ts:
@@ -280,15 +346,15 @@ async def ws_voice(websocket: WebSocket):
                 # Voice mode: LLM handles multilingual natively, no translator needed
                 llm_input = text
 
-                # 3. Screen capture — voice mode'da da ekranı gör
+                # 3. Screen capture — voice mode'da da get_best_frame() kullan
+                # Sprint 8.1: Respect screen_context_enabled (PRIVACY FIX — C-02)
                 voice_artifact = None
-                if state.capture:
-                    frame = state.capture.grab_now()
+                if state.screen_context_enabled and state.capture:
+                    frame = state.capture.get_best_frame()
                     if frame:
                         from src.image_artifact import build_artifact_from_frame
                         voice_artifact = build_artifact_from_frame(frame, source_override="voice_screen")
-                        logger.info(f"🎤📸 Voice: frame artifact ({frame.width}x{frame.height})")
-
+                        logger.info(f"🎤📸 Voice: screen artifact ({frame.width}x{frame.height})")
                 if state.llm is None:
                     await state.ws_manager.send_json(websocket, {
                         "type": "error",

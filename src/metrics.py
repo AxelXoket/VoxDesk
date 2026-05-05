@@ -83,10 +83,12 @@ class MetricsCollector:
             "audio_queue_depth": 0,
         }
 
-        # Boolean flags
+        # Boolean flags — Sprint 8.1: Pre-register all model-loaded flags
         self._flags: dict[str, bool] = {
             "model_loaded_stt": False,
             "model_loaded_tts": False,
+            "model_loaded_llm": False,          # Sprint 8.1: was silently dropped
+            "model_loaded_translator": False,    # Sprint 8.1: was silently dropped
         }
 
     # ── Latency ──────────────────────────────────────────────

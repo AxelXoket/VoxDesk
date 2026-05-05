@@ -108,6 +108,9 @@ class AudioCapture {
         this._maxPendingChunks = 10;
         this._ackTimeoutMs = 3000;
         this._ackTimer = null;
+
+        // Sprint 7: RMS level callback — silence detection / waveform
+        this.onLevelUpdate = null; // (rms: number) => void
     }
 
     /**
@@ -223,9 +226,18 @@ class AudioCapture {
         const source = this._audioContext.createMediaStreamSource(this._stream);
         this._workletNode = new AudioWorkletNode(this._audioContext, 'audio-processor');
 
-        // Worklet'ten gelen PCM data'yı WS'e gönder
+        // Worklet'ten gelen mesajları işle (PCM data + RMS level)
         this._workletNode.port.onmessage = (event) => {
             if (!this._recording) return;
+
+            // Sprint 7: RMS level mesajı — silence detection / waveform
+            if (event.data.type === 'rms_level') {
+                if (this.onLevelUpdate) {
+                    this.onLevelUpdate(event.data.rms);
+                }
+                return;
+            }
+
             if (event.data.type !== 'pcm_data') return;
 
             // Max süre kontrolü

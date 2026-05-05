@@ -9,22 +9,16 @@ class VoxChat {
         this.messagesEl = document.getElementById('chatMessages');
         this.inputEl = document.getElementById('chatInput');
         this.sendBtn = document.getElementById('btnSend');
-        this.uploadBtn = document.getElementById('btnUpload');
-        this.fileInput = document.getElementById('fileInput');
-        this.attachmentStrip = document.getElementById('attachmentStrip');
         this.alwaysOnToggle = document.getElementById('alwaysOnToggle');
         this.pinIndicator = document.getElementById('pinIndicator');
         this.chatInputArea = document.getElementById('chatInputArea');
-        this.dropOverlay = document.getElementById('dropOverlay');
         this.lightbox = document.getElementById('lightbox');
         this.lightboxImg = document.getElementById('lightboxImg');
 
-        this.includeScreen = true; // always-on default
+        // Screen context: backend-driven, frontend only controls ON/OFF
+        this.includeScreen = true; // default: screen context ON
         this.isStreaming = false;
         this.currentStreamEl = null;
-        this.attachments = []; // {data: base64, preview: dataURL, type: 'file'|'pin'}
-        this.MAX_ATTACHMENTS = 5;
-        this.MAX_IMAGE_WIDTH = 1920;
 
         this.init();
     }
@@ -44,53 +38,44 @@ class VoxChat {
 
         this.inputEl.addEventListener('input', () => this.autoResize());
 
-        // Always-on toggle (iOS style)
-        this.alwaysOnToggle.addEventListener('change', () => {
+        // Screen context toggle (ON/OFF — backend is source of truth)
+        this.alwaysOnToggle.addEventListener('change', async () => {
             this.includeScreen = this.alwaysOnToggle.checked;
-        });
+            window.voxScreenEnabled = this.includeScreen;
 
-        // Upload button → file input
-        this.uploadBtn.addEventListener('click', () => this.fileInput.click());
+            // Update UI immediately
+            const dot = document.getElementById('captureDot');
+            const previewImg = document.getElementById('previewImage');
+            const placeholder = document.querySelector('.preview-placeholder');
 
-        // File input change
-        this.fileInput.addEventListener('change', (e) => {
-            this.handleFiles(e.target.files);
-            this.fileInput.value = ''; // Reset so same file can be selected again
-        });
-
-        // Drag & drop on input area
-        this.chatInputArea.addEventListener('dragenter', (e) => {
-            e.preventDefault();
-            this.dropOverlay.classList.add('active');
-        });
-        this.chatInputArea.addEventListener('dragover', (e) => {
-            e.preventDefault();
-        });
-        this.chatInputArea.addEventListener('dragleave', (e) => {
-            // Only hide if leaving the actual area
-            if (!this.chatInputArea.contains(e.relatedTarget)) {
-                this.dropOverlay.classList.remove('active');
-            }
-        });
-        this.chatInputArea.addEventListener('drop', (e) => {
-            e.preventDefault();
-            this.dropOverlay.classList.remove('active');
-            if (e.dataTransfer.files.length > 0) {
-                this.handleFiles(e.dataTransfer.files);
-            }
-        });
-
-        // Paste image from clipboard (Ctrl+V)
-        this.inputEl.addEventListener('paste', (e) => {
-            const items = e.clipboardData?.items;
-            if (!items) return;
-            for (const item of items) {
-                if (item.type.startsWith('image/')) {
-                    e.preventDefault();
-                    const file = item.getAsFile();
-                    if (file) this.handleFiles([file]);
-                    return;
+            if (this.includeScreen) {
+                if (dot) dot.classList.add('active');
+            } else {
+                if (dot) dot.classList.remove('active');
+                // Show paused state
+                if (previewImg) previewImg.style.opacity = '0.3';
+                if (placeholder) {
+                    placeholder.style.display = 'flex';
+                    placeholder.querySelector('span').innerHTML = 'Ekran yakalama<br>devre dışı';
                 }
+            }
+
+            // Notify backend
+            try {
+                const res = await fetch('/api/screen/toggle', { method: 'PUT' });
+                const data = await res.json();
+                if (data.status === 'ok') {
+                    // Sync state
+                    this.includeScreen = data.screen_enabled;
+                    this.alwaysOnToggle.checked = data.screen_enabled;
+                    window.voxScreenEnabled = data.screen_enabled;
+
+                    if (data.screen_enabled) {
+                        if (previewImg) previewImg.style.opacity = '1';
+                    }
+                }
+            } catch (e) {
+                console.error('[Chat] Screen toggle error:', e);
             }
         });
 
@@ -109,92 +94,6 @@ class VoxChat {
         if (timeEl) timeEl.textContent = this.formatTime(new Date());
     }
 
-    // ── File Handling ────────────────────────────────────────
-
-    handleFiles(files) {
-        for (const file of files) {
-            if (!file.type.startsWith('image/')) continue;
-            if (this.attachments.length >= this.MAX_ATTACHMENTS) {
-                console.warn('[Chat] Max attachment limit reached');
-                break;
-            }
-            this.processImage(file);
-        }
-    }
-
-    processImage(file) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const img = new Image();
-            img.onload = () => {
-                // Resize if needed
-                const canvas = document.createElement('canvas');
-                let w = img.width;
-                let h = img.height;
-                if (w > this.MAX_IMAGE_WIDTH) {
-                    h = Math.round(h * (this.MAX_IMAGE_WIDTH / w));
-                    w = this.MAX_IMAGE_WIDTH;
-                }
-                canvas.width = w;
-                canvas.height = h;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, w, h);
-
-                // Convert to JPEG for consistent LLM input
-                const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
-
-                const attachment = {
-                    data: dataUrl,
-                    preview: dataUrl,
-                    type: 'file',
-                    name: file.name,
-                };
-                this.attachments.push(attachment);
-                this.renderAttachments();
-            };
-            img.src = e.target.result;
-        };
-        reader.readAsDataURL(file);
-    }
-
-    renderAttachments() {
-        this.attachmentStrip.innerHTML = '';
-        this.attachments.forEach((att, index) => {
-            const thumb = document.createElement('div');
-            thumb.className = 'attachment-thumb';
-
-            const img = document.createElement('img');
-            img.src = att.preview;
-            img.alt = att.name || 'Attachment';
-            img.addEventListener('click', () => this.showLightbox(att.preview));
-
-            const removeBtn = document.createElement('button');
-            removeBtn.className = 'remove-btn';
-            removeBtn.textContent = '✕';
-            removeBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                this.attachments.splice(index, 1);
-                this.renderAttachments();
-            });
-
-            thumb.appendChild(img);
-            thumb.appendChild(removeBtn);
-
-            if (att.type === 'pin') {
-                const badge = document.createElement('span');
-                badge.className = 'pin-badge';
-                badge.textContent = '📌 PIN';
-                thumb.appendChild(badge);
-            }
-
-            this.attachmentStrip.appendChild(thumb);
-        });
-    }
-
-    showLightbox(src) {
-        this.lightboxImg.src = src;
-        this.lightbox.classList.add('active');
-    }
 
     // ── Pin Support ──────────────────────────────────────────
 
@@ -210,29 +109,21 @@ class VoxChat {
 
     send() {
         const text = this.inputEl.value.trim();
-        if ((!text && this.attachments.length === 0) || this.isStreaming) return;
+        if (!text || this.isStreaming) return;
 
         // Disable send during streaming
         this.sendBtn.disabled = true;
         this.sendBtn.classList.add('disabled');
 
-        // Show user message with any attachment thumbnails
-        this.addMessage('user', text, false, this.attachments.map(a => a.preview));
+        // Show user message
+        this.addMessage('user', text);
         this.inputEl.value = '';
         this.autoResize();
 
-        // Build attachment payload
-        const attachmentPayload = this.attachments.map(a => ({
-            data: a.data,
-            type: a.type,
-        }));
+        // Send via WS — screen context is backend-driven, no attachments
+        window.voxWs.sendChat(text, this.includeScreen);
 
-        // Send via WS
-        window.voxWs.sendChat(text, this.includeScreen, attachmentPayload);
-
-        // Clear attachments & pin indicator
-        this.attachments = [];
-        this.renderAttachments();
+        // Clear pin indicator (if any)
         this.hidePinIndicator();
 
         // Typing indicator
@@ -265,6 +156,10 @@ class VoxChat {
 
             case 'end':
                 this.isStreaming = false;
+                // Sprint 7: Add read-aloud button to completed stream message
+                if (this.currentStreamEl) {
+                    this._addReadAloudButton(this.currentStreamEl);
+                }
                 this.currentStreamEl = null;
                 this.sendBtn.disabled = false;
                 this.sendBtn.classList.remove('disabled');
@@ -282,7 +177,7 @@ class VoxChat {
         }
     }
 
-    addMessage(role, content, isStream = false, imagePreviews = []) {
+    addMessage(role, content, isStream = false) {
         const msgEl = document.createElement('div');
         msgEl.className = `message message-${role}`;
 
@@ -293,20 +188,9 @@ class VoxChat {
         };
         const avatar = avatarSvgs[role] || avatarSvgs.user;
 
-        // Build image thumbnails HTML
-        let imagesHtml = '';
-        if (imagePreviews && imagePreviews.length > 0) {
-            imagesHtml = '<div class="message-attachments">';
-            for (let i = 0; i < imagePreviews.length; i++) {
-                imagesHtml += `<img src="${this.escapeHtml(imagePreviews[i])}" alt="Attachment" data-lightbox-index="${i}">`;
-            }
-            imagesHtml += '</div>';
-        }
-
         msgEl.innerHTML = `
             <div class="message-avatar">${avatar}</div>
             <div class="message-bubble">
-                ${imagesHtml}
                 <div class="message-content">${this.escapeHtml(content)}</div>
                 <div class="message-meta">
                     <span class="message-time">${this.formatTime(new Date())}</span>
@@ -315,19 +199,38 @@ class VoxChat {
         `;
 
         this.messagesEl.appendChild(msgEl);
+        this.scrollToBottom();
 
-        // Safe click delegation for lightbox images (replaces inline onclick XSS)
-        if (imagePreviews && imagePreviews.length > 0) {
-            const imgs = msgEl.querySelectorAll('img[data-lightbox-index]');
-            imgs.forEach(img => {
-                const idx = parseInt(img.dataset.lightboxIndex, 10);
-                img.style.cursor = 'pointer';
-                img.addEventListener('click', () => this.showLightbox(imagePreviews[idx]));
-            });
+        // Sprint 7: Add read-aloud button to assistant messages (non-stream)
+        if (role === 'assistant' && !isStream && content) {
+            this._addReadAloudButton(msgEl);
         }
 
-        this.scrollToBottom();
         return msgEl;
+    }
+
+    /**
+     * Sprint 7: Add read-aloud button to a message element.
+     * @param {HTMLElement} msgEl
+     */
+    _addReadAloudButton(msgEl) {
+        const metaEl = msgEl.querySelector('.message-meta');
+        const contentEl = msgEl.querySelector('.message-content');
+        if (!metaEl || !contentEl) return;
+
+        const text = contentEl.textContent?.trim();
+        if (!text) return;
+
+        const readBtn = document.createElement('button');
+        readBtn.className = 'read-aloud-btn';
+        readBtn.title = 'Sesli oku';
+        readBtn.textContent = '🔊';
+        readBtn.addEventListener('click', () => {
+            window.dispatchEvent(new CustomEvent('readAloud', {
+                detail: { text, button: readBtn },
+            }));
+        });
+        metaEl.appendChild(readBtn);
     }
 
     showTyping() {

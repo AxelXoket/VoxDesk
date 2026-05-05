@@ -5,34 +5,34 @@
 
 /* ---------- CSS Variables ---------- */
 :root {
-    /* Backgrounds */
-    --bg-primary: #000000;
-    --bg-secondary: #050508;
-    --bg-elevated: #0a0a12;
+    /* Backgrounds — deep graphite */
+    --bg-primary: #0a0a0c;
+    --bg-secondary: #0f0f13;
+    --bg-elevated: #141418;
 
-    /* Glass */
-    --glass-bg: rgba(255, 255, 255, 0.03);
+    /* Glass — subtle, not overbright */
+    --glass-bg: rgba(255, 255, 255, 0.025);
     --glass-border: rgba(255, 255, 255, 0.06);
-    --glass-hover: rgba(255, 255, 255, 0.06);
-    --glass-blur: 20px;
+    --glass-hover: rgba(255, 255, 255, 0.05);
+    --glass-blur: 16px;
 
-    /* Accent — VoxDesk cyan-magenta palette */
-    --accent-cyan: #00f5ff;
-    --accent-magenta: #ff00ff;
-    --accent-pink: #ff6bcb;
-    --accent-gradient: linear-gradient(135deg, #00f5ff, #ff00ff);
-    --accent-glow: 0 0 20px rgba(0, 245, 255, 0.3);
+    /* Accent — muted cyan, no magenta/pink neon */
+    --accent-cyan: #5ec4d4;
+    --accent-magenta: #8b7ea6;
+    --accent-pink: #a08bb0;
+    --accent-gradient: linear-gradient(135deg, #5ec4d4, #7ba4c4);
+    --accent-glow: 0 0 12px rgba(94, 196, 212, 0.15);
 
-    /* Text */
-    --text-primary: #e8e8ef;
-    --text-secondary: #8888a0;
-    --text-muted: #555570;
+    /* Text — warm, readable */
+    --text-primary: #d8d8e0;
+    --text-secondary: #7c7c92;
+    --text-muted: #50505e;
 
-    /* Messages */
-    --msg-user-bg: rgba(0, 245, 255, 0.08);
-    --msg-user-border: rgba(0, 245, 255, 0.15);
-    --msg-assistant-bg: rgba(255, 0, 255, 0.05);
-    --msg-assistant-border: rgba(255, 0, 255, 0.1);
+    /* Messages — subtle, not tinted */
+    --msg-user-bg: rgba(94, 196, 212, 0.06);
+    --msg-user-border: rgba(94, 196, 212, 0.12);
+    --msg-assistant-bg: rgba(139, 126, 166, 0.04);
+    --msg-assistant-border: rgba(139, 126, 166, 0.08);
 
     /* Sizes */
     --sidebar-width: 420px;
@@ -276,6 +276,7 @@ html, body {
     border-radius: 8px;
     object-fit: contain;
     background: var(--bg-primary);
+    transition: opacity 0.3s ease;
 }
 
 .live-dot {
@@ -492,8 +493,8 @@ html, body {
 }
 
 .message-assistant .message-avatar {
-    color: rgba(200, 140, 255, 0.8);
-    border-color: rgba(255, 0, 255, 0.12);
+    color: rgba(160, 160, 190, 0.8);
+    border-color: rgba(139, 126, 166, 0.12);
 }
 
 .message-user .message-avatar {
@@ -995,4 +996,178 @@ html, body {
     max-height: 90vh;
     object-fit: contain;
     border-radius: 8px;
+}
+
+/* ═══════════════════════════════════════════════
+   Sprint 7 : Full Voice Mode Overlay
+   ═══════════════════════════════════════════════ */
+.fvm-overlay {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+    padding: 40px 24px;
+    flex: 1;
+    background: var(--bg-primary);
+    animation: fvm-fadeIn 0.3s ease;
+}
+
+@keyframes fvm-fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.fvm-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    max-width: 400px;
+    justify-content: space-between;
+}
+
+.fvm-title {
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    background: var(--accent-gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.fvm-close {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 8px;
+    cursor: pointer;
+    color: var(--text-secondary);
+    transition: all var(--transition-fast);
+}
+
+.fvm-close:hover {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: rgba(239, 68, 68, 0.3);
+    color: #ef4444;
+}
+
+/* ── FVM Waveform ──────────────────────────── */
+.fvm-waveform {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    height: 80px;
+    width: 100%;
+    max-width: 400px;
+    padding: 8px 0;
+}
+
+.fvm-bar {
+    width: 4px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--accent-gradient);
+    transition: height 0.06s ease-out;
+    min-height: 4px;
+}
+
+/* ── FVM Status ────────────────────────────── */
+.fvm-status {
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.3px;
+    transition: color var(--transition-fast);
+}
+
+/* State colors via data-state attribute */
+.fvm-overlay[data-state="listening"] .fvm-status {
+    color: var(--accent-cyan);
+}
+
+.fvm-overlay[data-state="user_speaking"] .fvm-status {
+    color: #4ade80;
+}
+
+.fvm-overlay[data-state="silence_countdown"] .fvm-status {
+    color: #fbbf24;
+}
+
+.fvm-overlay[data-state="processing"] .fvm-status {
+    color: var(--accent-magenta);
+    animation: fvm-processPulse 1.2s ease-in-out infinite;
+}
+
+.fvm-overlay[data-state="ai_speaking"] .fvm-status {
+    color: var(--accent-pink);
+}
+
+.fvm-overlay[data-state="error"] .fvm-status {
+    color: #ef4444;
+}
+
+@keyframes fvm-processPulse {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; }
+}
+
+/* State-aware waveform glow */
+.fvm-overlay[data-state="user_speaking"] .fvm-bar {
+    background: linear-gradient(180deg, #4ade80, var(--accent-cyan));
+    box-shadow: 0 0 4px rgba(74, 222, 128, 0.15);
+}
+
+.fvm-overlay[data-state="silence_countdown"] .fvm-bar {
+    background: linear-gradient(180deg, #fbbf24, #f59e0b);
+    opacity: 0.6;
+}
+
+.fvm-overlay[data-state="processing"] .fvm-bar,
+.fvm-overlay[data-state="ai_speaking"] .fvm-bar {
+    background: var(--accent-gradient);
+    opacity: 0.3;
+}
+
+/* ═══════════════════════════════════════════════
+   Sprint 7 : Read-Aloud Button
+   ═══════════════════════════════════════════════ */
+.read-aloud-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    margin-left: 6px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--text-muted);
+    transition: all var(--transition-fast);
+    vertical-align: middle;
+}
+
+.read-aloud-btn:hover {
+    color: var(--accent-cyan);
+    background: rgba(0, 245, 255, 0.08);
+    border-color: rgba(0, 245, 255, 0.2);
+}
+
+.read-aloud-btn.playing {
+    color: var(--accent-pink);
+    animation: readAloudPulse 1s ease-in-out infinite;
+}
+
+@keyframes readAloudPulse {
+    0%, 100% { opacity: 0.7; }
+    50% { opacity: 1; }
 }

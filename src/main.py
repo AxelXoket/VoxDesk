@@ -63,6 +63,10 @@ class AppState:
     ws_manager: ConnectionManager = field(default_factory=ConnectionManager)
     hotkey_manager: HotkeyManager | None = None
     tray: TrayIcon | None = None
+    sidecar: "SidecarManager | None" = None  # Sprint 8: local llama-server sidecar
+    # Sprint 8.1: Declared runtime toggles — replaces ad-hoc getattr patterns
+    screen_context_enabled: bool = True      # Screen capture ON/OFF for LLM context
+    voice_activation_enabled: bool = True     # Voice activation ON/OFF
     # Sprint 3: last error tracking for DEV HUD
     _last_error: str | None = None
     _last_error_time: float | None = None
@@ -117,11 +121,39 @@ async def lifespan(app: FastAPI):
 
         # LLM — degraded mode if model missing
         try:
-            _state.llm = _state.registry.create(
-                "llm", config.llm.provider, config.llm
-            )
-            _state.llm.set_metrics(_state.metrics)  # Sprint 3: metrics injection
-            logger.info(f"  🤖 Model: {config.llm.model_path or 'not configured'}")
+            if config.llm.provider == "local-llama-server":
+                # Sprint 8: Local llama-server sidecar provider
+                from src.llm.local_server_provider import LocalLlamaServerProvider
+                from src.llm.sidecar import SidecarManager
+
+                server_cfg = config.local_llama_server
+                if not server_cfg.enabled:
+                    logger.warning("  ⚠️ local_llama_server disabled in config — LLM unavailable")
+                    _state.llm = None
+                else:
+                    # Start sidecar if auto_start
+                    if server_cfg.auto_start:
+                        _state.sidecar = SidecarManager(server_cfg)
+                        logger.info("  🚀 Starting local llama-server sidecar...")
+                        await _state.sidecar.start()
+
+                    # Create HTTP provider
+                    _state.llm = LocalLlamaServerProvider(server_cfg)
+                    _state.llm.set_metrics(_state.metrics)
+
+                    # Health check
+                    is_healthy = await _state.llm.health_check()
+                    vision_status = "vision" if _state.llm.has_vision else "text-only"
+                    if is_healthy:
+                        logger.info(f"  🤖 Local server: {server_cfg.model_path} ({vision_status})")
+                    else:
+                        logger.warning(f"  ⚠️ Local server not reachable — LLM degraded")
+            else:
+                _state.llm = _state.registry.create(
+                    "llm", config.llm.provider, config.llm
+                )
+                _state.llm.set_metrics(_state.metrics)
+                logger.info(f"  🤖 Model: {config.llm.model_path or 'not configured'}")
         except FileNotFoundError as e:
             logger.warning(f"  ⚠️ LLM unavailable (degraded mode): {e}")
             _state.llm = None
@@ -372,9 +404,19 @@ async def _safe_shutdown() -> None:
     # LLM
     try:
         if _state.llm:
+            if hasattr(_state.llm, 'aclose'):
+                await _state.llm.aclose()
             _state.llm.unload()
     except Exception as e:
         logger.error(f"LLM shutdown hatası: {e}")
+
+    # Sidecar (local llama-server)
+    try:
+        if _state.sidecar:
+            await _state.sidecar.stop()
+            logger.info("llama-server sidecar stopped")
+    except Exception as e:
+        logger.error(f"Sidecar shutdown hatası: {e}")
 
     # Hotkeys
     try:
@@ -523,6 +565,24 @@ async def runtime_status():
         "translator": _model_info(state.translator, "model_path"),
     }
 
+    # LLM provider info — honest vision capability reporting
+    llm_provider_info = {
+        "provider": config.llm.provider,
+        "has_vision": state.llm.has_vision if state.llm else False,
+        "server_available": getattr(state.llm, '_server_available', None),
+    }
+
+    # Sidecar status
+    sidecar_info = None
+    if state.sidecar:
+        sidecar_info = {
+            "running": state.sidecar.is_running,
+            "healthy": state.sidecar.is_healthy,
+        }
+
+    # Screen context status — declared AppState field (Sprint 8.1)
+    screen_ctx_enabled = state.screen_context_enabled
+
     # Features — booleans only from config
     features = {
         "enable_module_registry": config.features.enable_module_registry,
@@ -541,8 +601,11 @@ async def runtime_status():
             "degraded": degraded,
         },
         "capture": capture_info,
+        "screen_context_enabled": screen_ctx_enabled,
         "connections": connections,
         "models": models,
+        "llm_provider": llm_provider_info,
+        "sidecar": sidecar_info,
         "features": features,
         "last_error": state._last_error,
         "last_error_time": state._last_error_time,

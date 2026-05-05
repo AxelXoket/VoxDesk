@@ -1,6 +1,7 @@
-﻿/**
+/**
  * VoxDesk — Screen Preview
  * WebSocket üzerinden canlı ekran görüntüsü.
+ * Sprint 7.2: Honors window.voxScreenEnabled flag.
  */
 
 class VoxScreenPreview {
@@ -18,10 +19,14 @@ class VoxScreenPreview {
     }
 
     handleFrame(data) {
+        // Sprint 7.2: Skip frame updates when screen capture is disabled
+        if (window.voxScreenEnabled === false) return;
+
         if (data.type === 'frame' && data.image) {
             // Base64 image göster
             this.previewImg.src = `data:image/jpeg;base64,${data.image}`;
             this.previewImg.style.display = 'block';
+            this.previewImg.style.opacity = '1';
             if (this.placeholder) this.placeholder.style.display = 'none';
 
             // Live dot aktif

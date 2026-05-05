@@ -19,26 +19,43 @@ document.addEventListener('DOMContentLoaded', () => {
     checkHealth();
     setInterval(checkHealth, 30000);
 
-    // Voice mode button
+    // Sprint 7: Full Voice Mode — initialize
+    let voxFullVoice = null;
+    if (window.FullVoiceMode) {
+        voxFullVoice = new FullVoiceMode();
+        window.VoxFullVoice = voxFullVoice;
+    }
+
+    // Voice mode button — now toggles Full Voice Mode
     const voiceModeBtn = document.getElementById('btnVoiceMode');
-    const voiceIndicator = document.getElementById('voiceIndicator');
-    let voiceModeActive = false;
 
     voiceModeBtn.addEventListener('click', () => {
-        voiceModeActive = !voiceModeActive;
-        voiceIndicator.style.display = voiceModeActive ? 'flex' : 'none';
-        voiceModeBtn.style.background = voiceModeActive
+        // Sprint 7: If FVM is available, use it instead of legacy indicator
+        if (voxFullVoice) {
+            if (voxFullVoice.isActive) {
+                voxFullVoice.deactivate();
+                voiceModeBtn.style.background = 'var(--glass-bg)';
+            } else {
+                voxFullVoice.activate();
+                voiceModeBtn.style.background = 'rgba(0, 245, 255, 0.15)';
+            }
+            return;
+        }
+
+        // Legacy fallback (no FVM) — Sprint 7.1: simplified, voiceModeActive removed
+        const voiceIndicator = document.getElementById('voiceIndicator');
+        const nowActive = voiceIndicator && voiceIndicator.style.display !== 'flex';
+        if (voiceIndicator) voiceIndicator.style.display = nowActive ? 'flex' : 'none';
+        voiceModeBtn.style.background = nowActive
             ? 'rgba(0, 245, 255, 0.15)'
             : 'var(--glass-bg)';
 
-        if (voiceModeActive) {
-            // Sprint 3.5: Feature flag check before connecting voice
+        if (nowActive) {
             const features = _cachedFeatures;
             if (features && !features.enable_binary_audio && !features.enable_mediarecorder_fallback) {
                 console.warn('[App] Voice disabled by config');
                 window.VoxChat.addMessage('assistant', '⚠️ Voice is currently disabled in configuration.');
-                voiceModeActive = false;
-                voiceIndicator.style.display = 'none';
+                if (voiceIndicator) voiceIndicator.style.display = 'none';
                 voiceModeBtn.style.background = 'var(--glass-bg)';
                 return;
             }
@@ -101,6 +118,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     micBtn.addEventListener('click', async () => {
+        // Sprint 7.1: Block dictation while Full Voice Mode is active
+        if (voxFullVoice && voxFullVoice.isActive) {
+            console.warn('[App] Dictation blocked — Full Voice Mode is active');
+            return;
+        }
         if (audioCapture && audioCapture.isRecording) {
             stopRecording();
         } else {
@@ -120,7 +142,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     window.voxWs.on('voice:message', (data) => {
-        // Sprint 2: Route ACK/error to AudioCapture
+        // Sprint 7: FVM active → FVM handles all voice messages
+        if (voxFullVoice && voxFullVoice.isActive) {
+            voxFullVoice.handleVoiceMessage(data);
+            return;
+        }
+
+        // Sprint 2: Route ACK/error to AudioCapture (dictation mode)
         if (audioCapture) {
             audioCapture.handleMessage(data);
         }
@@ -159,6 +187,58 @@ document.addEventListener('DOMContentLoaded', () => {
     settingsBtn.addEventListener('click', () => {
         settingsPanel.style.display =
             settingsPanel.style.display === 'none' ? 'block' : 'none';
+    });
+
+    // Sprint 7: Read-aloud event handler
+    window.addEventListener('readAloud', async (e) => {
+        const { text, button } = e.detail || {};
+        if (!text) return;
+
+        // Visual feedback
+        if (button) button.classList.add('playing');
+
+        try {
+            const res = await fetch('/api/tts/read', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text }),
+            });
+
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                console.warn('[ReadAloud] Error:', err.error || res.status);
+                // Sprint 7.2: User-visible feedback when TTS unavailable
+                if (res.status === 503) {
+                    window.VoxChat?.addMessage('assistant', '⚠️ Sesli okuma şu an kullanılamıyor (TTS yüklenmedi).');
+                }
+                if (button) button.classList.remove('playing');
+                return;
+            }
+
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+
+            // Sprint 7.1: Stop active audio + reset both queues so no stale callbacks remain
+            voxStopAudio();
+            resetTtsPlayback(ttsQueue);
+
+            const audio = new Audio(url);
+            activeAudio = audio;
+            audio.play().catch(err => {
+                console.warn('[ReadAloud] Autoplay blocked:', err);
+                URL.revokeObjectURL(url);
+                activeAudio = null;
+                if (button) button.classList.remove('playing');
+            });
+            audio.onended = () => {
+                URL.revokeObjectURL(url);
+                activeAudio = null;
+                if (button) button.classList.remove('playing');
+            };
+        } catch (e) {
+            console.error('[ReadAloud] Fetch error:', e);
+            if (button) button.classList.remove('playing');
+        }
     });
 
     console.log('✅ VoxDesk UI hazır!');
@@ -206,8 +286,43 @@ async function checkHealth() {
     }
 }
 
+// Sprint 7: Global active audio reference — prevents TTS/read-aloud conflicts
+let activeAudio = null;
+
+/**
+ * Sprint 7.1: Stop currently playing audio without triggering stale onended
+ * callbacks.  Always call this before starting a new Audio() so queued
+ * `playNextTTS` / FVM chain functions are not re-invoked for interrupted audio.
+ */
+function voxStopAudio() {
+    if (activeAudio) {
+        activeAudio.onended = null; // nullify before pause — prevents stale callback
+        activeAudio.pause();
+        activeAudio = null;
+    }
+}
+
+/**
+ * Sprint 7.1: Drain a TTS queue array and reset its playing flag.
+ * Pass the queue array that owns the audio that was interrupted.
+ * @param {Array} queue  - the ttsQueue array to drain
+ */
+function resetTtsPlayback(queue) {
+    if (Array.isArray(queue)) queue.length = 0;
+    // FVM queue is global — also clear it so next FVM activation starts clean
+    if (window._fvmTtsQueue) window._fvmTtsQueue.length = 0;
+    window._fvmTtsPlaying = false;
+}
+
+// Expose helpers globally so FVM deactivate can call them without a closure
+window.voxStopAudio = voxStopAudio;
+window.resetTtsPlayback = resetTtsPlayback;
+
 function playAudio(base64Audio, onEnded) {
     try {
+        // Sprint 7.1: Stop previous audio + nullify stale onended before starting new
+        voxStopAudio();
+
         const audioData = atob(base64Audio);
         const arrayBuf = new ArrayBuffer(audioData.length);
         const view = new Uint8Array(arrayBuf);
@@ -218,20 +333,27 @@ function playAudio(base64Audio, onEnded) {
         const blob = new Blob([arrayBuf], { type: 'audio/wav' });
         const url = URL.createObjectURL(blob);
         const audio = new Audio(url);
+        activeAudio = audio;
         audio.play().catch(err => {
             console.warn('Audio autoplay blocked:', err);
             URL.revokeObjectURL(url);
+            activeAudio = null;
             if (onEnded) onEnded();
         });
         audio.onended = () => {
             URL.revokeObjectURL(url);
+            activeAudio = null;
             if (onEnded) onEnded();
         };
     } catch (e) {
         console.error('Audio çalma hatası:', e);
+        activeAudio = null;
         if (onEnded) onEnded();
     }
 }
+
+// Sprint 7: Global alias for FVM TTS queue
+window.playAudioFromBase64 = playAudio;
 
 // Büyük ArrayBuffer'ları güvenli base64'e çevir (btoa 2MB+ crash'leri önler)
 function arrayBufferToBase64(buffer) {
