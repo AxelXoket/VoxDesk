@@ -6,6 +6,7 @@ app:
   debug: false
 
 capture:
+  backend: "dxcam"           # dxcam — Windows DirectX screen capture
   interval_seconds: 1.0
   buffer_size: 30        # Last 30 frames (ring buffer)
   jpeg_quality: 85          # Legacy default (preview fallback)
@@ -20,11 +21,11 @@ capture:
   inference_jpeg_quality: 92
 
 llm:
-  provider: "llama-cpp"
-  model_path: "models/Qwen2.5-VL-7B/Qwen_Qwen2.5-VL-7B-Instruct-Q8_0.gguf"
-  mmproj_path: "models/Qwen2.5-VL-7B/mmproj-Qwen_Qwen2.5-VL-7B-Instruct-f16.gguf"
-  fallback_model_path: "models/gemma-4-E4B-official/gemma-4-E4B-it-Q8_0.gguf"
-  fallback_mmproj_path: "models/gemma-4-E4B-official/mmproj-gemma-4-E4B-it-bf16.gguf"
+  provider: "local-llama-server"
+  model_path: "models/gemma-4-E4B-uncensored/Gemma-4-E4B-Uncensored-HauhauCS-Aggressive-Q8_K_P.gguf"
+  mmproj_path: "models/gemma-4-E4B-uncensored/mmproj-Gemma-4-E4B-Uncensored-HauhauCS-Aggressive-f16.gguf"
+  fallback_model_path: "models/Qwen2.5-VL-7B/Qwen_Qwen2.5-VL-7B-Instruct-Q8_0.gguf"
+  fallback_mmproj_path: "models/Qwen2.5-VL-7B/mmproj-Qwen_Qwen2.5-VL-7B-Instruct-f16.gguf"
   n_gpu_layers: -1            # -1 = full GPU offload
   n_ctx: 8192                 # 16GB VRAM budget
   chat_format: null           # null = auto-detect from model
@@ -32,6 +33,31 @@ llm:
   max_tokens: 512
   repeat_penalty: 1.15             # Prevent repetition loops (InternVL3 prone to this)
   context_messages: 10        # Send last N messages as context
+
+# ── Local llama-server sidecar (Gemma4 vision via HTTP) ──────────
+local_llama_server:
+  enabled: true
+  executable_path: ""  # REQUIRED — set to local llama-server.exe path before starting
+  # Dev example:  "C:/Users/USER/.docker/bin/inference/llama-server.exe"
+  # EXE packaging: bundled llama-server.exe next to VoxDesk.exe
+  #   VoxDesk.exe
+  #   llama-server.exe  (or bin/llama-server.exe)
+  #   models/gemma-4-E4B-uncensored/*.gguf
+  base_url: "http://127.0.0.1:8081"
+  port: 8081
+  model_path: "models/gemma-4-E4B-uncensored/Gemma-4-E4B-Uncensored-HauhauCS-Aggressive-Q8_K_P.gguf"
+  mmproj_path: "models/gemma-4-E4B-uncensored/mmproj-Gemma-4-E4B-Uncensored-HauhauCS-Aggressive-f16.gguf"
+  n_gpu_layers: 99
+  n_ctx: 8192
+  jinja: true
+  auto_start: true
+  startup_timeout_seconds: 120.0
+  shutdown_timeout_seconds: 10.0
+  temperature: 1.0            # Gemma4 recommended
+  top_p: 0.95                 # Gemma4 recommended
+  top_k: 64                   # Gemma4 recommended
+  max_tokens: 512
+  context_messages: 10
 
 tts:
   engine: "kokoro"
@@ -82,6 +108,7 @@ features:
   enable_mediarecorder_fallback: true
   enable_debug_metrics: false
   enable_debug_capture_export: false    # Part 1.5: image debug frame export
+  enable_full_voice_mode: true          # Sprint 7: Full Voice Mode UI
 
 network:
   bind_host: "127.0.0.1"

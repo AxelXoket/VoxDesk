@@ -6,9 +6,10 @@ Receive loop:
     1. Text frame → JSON dispatch (audio_config, audio_end, audio_cancel)
     2. Binary frame → PCM decode (only after handshake)
 
-Voice mode — text-only:
-    Sesli girdi sadece metin olarak LLM'e gönderilir.
-    Ekran analizi sadece chat (text) pipeline'da kullanılır.
+Voice mode — unified screen context:
+    Screen context ON ise ses isteğine otomatik ekran bağlamı eklenir.
+    Screen context OFF ise LLM'e image artifact gönderilmez.
+    Chat pipeline ile aynı politika: get_best_frame() → build_artifact_from_frame().
 
 Güvenlik:
     - Binary before handshake → protocol_error
@@ -253,15 +254,21 @@ async def _process_audio_buffer(
     # Voice mode: LLM algılar dili, çeviri yapılmaz.
     llm_input = text
 
+    # Screen context — unified policy (chat/voice aynı davranış)
+    # Sprint 8.1: Use declared AppState field
+    voice_artifact = None
+    if state.screen_context_enabled and state.capture:
+        frame = state.capture.get_best_frame()
+        if frame:
+            from src.image_artifact import build_artifact_from_frame
+            voice_artifact = build_artifact_from_frame(frame, source_override="voice_screen")
+            logger.info(f"🎤📸 Voice v2: screen artifact ({frame.width}x{frame.height})")
+
     # LLM — async, non-blocking
-    # Voice mode = text-only (ekran analizi sadece chat pipeline'da)
-    # TODO(Part 1.5): voice_v2 binary path currently sends image_bytes=None.
-    #   Voice+Screen support is only present in legacy ws_voice path (chat.py).
-    #   Fix via InteractionOrchestrator or shared image resolver in Sprint 5.4+.
     try:
         if state.llm is None:
             raise RuntimeError("LLM unavailable — local model file missing")
-        llm_response = await state.llm.chat(llm_input, image_bytes=None, response_mode="voice")
+        llm_response = await state.llm.chat(llm_input, image_artifact=voice_artifact, response_mode="voice")
     except Exception as llm_err:
         logger.error(f"Voice LLM error: {llm_err}")
         state.metrics.increment("llm_errors_total")
@@ -315,6 +322,8 @@ async def _process_audio_buffer(
 
 
 # ── Legacy Base64 Handler ────────────────────────────────────
+# TODO(Sprint 8.1 backlog): _handle_legacy_audio duplicates most of _process_audio_buffer.
+# Extract shared voice pipeline (STT→LLM→TTS) into a common function to reduce maintenance risk.
 
 async def _handle_legacy_audio(
     websocket: WebSocket,
@@ -385,11 +394,20 @@ async def _handle_legacy_audio(
     # Voice mode: çeviri yok, LLM orijinal dilde cevaplar
     llm_input = text
 
-    # LLM — voice mode = text-only (no screen capture)
+    # Screen context — unified policy (legacy fallback da aynı davranış)
+    # Sprint 8.1: Use declared AppState field
+    voice_artifact = None
+    if state.screen_context_enabled and state.capture:
+        frame = state.capture.get_best_frame()
+        if frame:
+            from src.image_artifact import build_artifact_from_frame
+            voice_artifact = build_artifact_from_frame(frame, source_override="voice_screen")
+            logger.info(f"🎤📸 Voice v2 legacy: screen artifact ({frame.width}x{frame.height})")
+
     try:
         if state.llm is None:
             raise RuntimeError("LLM unavailable — local model file missing")
-        llm_response = await state.llm.chat(llm_input, image_bytes=None, response_mode="voice")
+        llm_response = await state.llm.chat(llm_input, image_artifact=voice_artifact, response_mode="voice")
     except Exception as llm_err:
         logger.error(f"Voice legacy LLM error: {llm_err}")
         state.record_error(f"Voice legacy LLM: {llm_err}")

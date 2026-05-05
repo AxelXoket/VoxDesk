@@ -312,7 +312,7 @@ class TestTranslatorConfig:
         assert cfg.engine == "marian"
         assert cfg.model_path == "models/opus-mt-tr-en"
         assert cfg.device == "cuda"
-        assert cfg.enabled is True
+        assert cfg.enabled is False  # LLM handles multilingual natively \u2014 translator dormant
 
     @pytest.mark.unit
     def test_translator_config_extra_forbid(self):

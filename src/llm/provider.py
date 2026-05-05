@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import AsyncGenerator
 
 from src.config import LLMConfig, PersonalityConfig, get_config
-from src.llm.types import ChatMessage, VISUAL_MEMO_PROMPT
+from src.llm.types import ChatMessage
 from src.llm.history import ConversationHistory
 
 logger = logging.getLogger("voxdesk.llm.provider")
@@ -62,7 +62,6 @@ class LlamaCppProvider:
             context_limit=config.context_messages,
         )
         self._metrics = None  # Post-creation injection via set_metrics()
-        self._last_visual_memo: str | None = None
         self._loaded = False
 
         logger.info(
@@ -661,46 +660,6 @@ class LlamaCppProvider:
                 self._metrics.increment("llm_errors_total")
             raise RuntimeError(f"LLM stream failed: {e}") from e
 
-    # ── Visual Memo ───────────────────────────────────────────
-
-    async def _bg_visual_memo(
-        self,
-        user_msg: ChatMessage,
-        image_bytes: bytes,
-    ) -> None:
-        """Arka planda visual memo üret — kullanıcı beklemez."""
-        try:
-            b64 = base64.b64encode(image_bytes).decode("utf-8")
-            messages = [{
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": VISUAL_MEMO_PROMPT},
-                    {
-                        "type": "image_url",
-                        "image_url": {"url": f"data:image/jpeg;base64,{b64}"},
-                    },
-                ],
-            }]
-
-            loop = asyncio.get_running_loop()
-
-            def _sync_memo():
-                self._ensure_loaded()
-                return self._llm.create_chat_completion(
-                    messages=messages,
-                    temperature=0.3,
-                    max_tokens=1024,
-                )
-
-            response = await loop.run_in_executor(None, _sync_memo)
-            memo = response["choices"][0]["message"]["content"]
-            user_msg.visual_memo = memo
-            self._last_visual_memo = memo
-            logger.debug(f"Visual memo: {memo[:100]}...")
-
-        except Exception as e:
-            logger.error(f"Visual memo hatası: {e}")
-            user_msg.visual_memo = "Ekran okunamadı."
 
     # ── History Delegation ────────────────────────────────────
 
@@ -726,7 +685,6 @@ class LlamaCppProvider:
             "loaded": self.is_loaded,
             "has_vision": self.has_vision,
             "history_length": len(self._history),
-            "last_visual_memo": self._last_visual_memo is not None,
         }
 
     async def aclose(self) -> None:

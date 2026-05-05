@@ -29,6 +29,10 @@
 
 | Model | Quant | Size | Path | Status |
 |:------|:------|:-----|:-----|:-------|
+| **Gemma-4 E4B Uncensored** (default) | Q8_K_P | 7.76 GB | `models/gemma-4-E4B-uncensored/Gemma-4-E4B-Uncensored-HauhauCS-Aggressive-Q8_K_P.gguf` | ✅ ⚠️ |
+| Gemma-4 E4B Uncensored mmproj | F16 | 944 MB | `models/gemma-4-E4B-uncensored/mmproj-Gemma-4-E4B-Uncensored-HauhauCS-Aggressive-f16.gguf` | ✅ ⚠️ |
+| Gemma-4 E4B Official | Q8_0 | ~4.5 GB | `models/gemma-4-E4B-official/gemma-4-E4B-it-Q8_0.gguf` | ✅ ⚠️ |
+| Gemma-4 E4B Official mmproj | BF16 | — | `models/gemma-4-E4B-official/mmproj-gemma-4-E4B-it-bf16.gguf` | ✅ ⚠️ |
 | MiniCPM-V 4.5 Official | Q6_K | 6.26 GB | `models/minicpm-v4.5-official/model-q6_k.gguf` | ✅ |
 | MiniCPM-V 4.5 mmproj | F16 | 1.02 GB | `models/minicpm-v4.5-official/mmproj-f16.gguf` | ✅ |
 | MiniCPM-V 4.5 Abliterated | Q6_K | — | `models/minicpm-v4.5-abliterated/` | ⏳ Onay bekleniyor |
@@ -38,6 +42,11 @@
 | Qwen3-VL-8B mmproj | F16 | ~1.3 GB | `models/qwen3-vl-8b-instruct/` | ⏳ İndirilmedi |
 | MarianMT opus-mt-tr-en | float16 | ~300 MB | `models/opus-mt-tr-en/` | ✅ |
 | Whisper large-v3-turbo | CTranslate2 FP16 | ~1.5 GB | `models/whisper-large-v3-turbo/` | ✅ |
+
+> **⚠️ Gemma4 Vision Limitation:** `llama-cpp-python 0.3.21` does NOT include a
+> `Gemma4ChatHandler`. The mmproj file is present but vision input is not wired — the model
+> runs as text-only. Qwen2.5-VL (fallback) has full vision support via `Qwen25VLChatHandler`.
+> Gemma4 vision requires either a newer llama-cpp-python release or a custom handler.
 
 ## VRAM Budget (RTX 5080 — 16 GB)
 

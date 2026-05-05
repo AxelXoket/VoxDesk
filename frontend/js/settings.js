@@ -10,7 +10,6 @@ class VoxSettings {
         this.speedSlider = document.getElementById('speedSlider');
         this.speedValue = document.getElementById('speedValue');
         this.ttsToggle = document.getElementById('ttsToggle');
-        this.vaToggle = document.getElementById('vaToggle');
         this.personalitySelect = document.getElementById('personalitySelect');
         this.exportBtn = document.getElementById('btnExportHistory');
         this.clearBtn = document.getElementById('btnClearHistory');
@@ -39,10 +38,7 @@ class VoxSettings {
             this.ttsToggle.addEventListener('change', () => this.toggleTts());
         }
 
-        // Voice activation toggle
-        if (this.vaToggle) {
-            this.vaToggle.addEventListener('change', () => this.toggleVoiceActivation());
-        }
+
 
         // Export history
         this.exportBtn.addEventListener('click', () => this.exportHistory());
@@ -67,7 +63,6 @@ class VoxSettings {
             this.speedSlider.value = data.tts_speed;
             this.speedValue.textContent = `${data.tts_speed}x`;
             this.ttsToggle.checked = data.tts_enabled;
-            this.vaToggle.checked = data.voice_activation_enabled;
         } catch (e) {
             console.error('Settings yüklenemedi:', e);
         }
@@ -166,18 +161,6 @@ class VoxSettings {
             }
         } catch (e) {
             console.error('TTS toggle hatası:', e);
-        }
-    }
-
-    async toggleVoiceActivation() {
-        try {
-            const res = await fetch('/api/voice-activation/toggle', { method: 'PUT' });
-            const data = await res.json();
-            if (data.status === 'ok' && this.vaToggle) {
-                this.vaToggle.checked = data.voice_activation_enabled;
-            }
-        } catch (e) {
-            console.error('Voice activation toggle hatası:', e);
         }
     }
 

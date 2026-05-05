@@ -6,15 +6,28 @@
 
 ## Outbound Network — Deny-by-Default
 
-Runtime'da internet çıkışı **yasaktır.** Aşağıdakiler çalışma zamanında **bulunmaz:**
+Runtime'da **dış internet** çıkışı **yasaktır.** Aşağıdakiler çalışma zamanında **bulunmaz:**
 
-- `requests`, `httpx`, `aiohttp`, `urllib.request` ile HTTP çıkışı
 - External LLM provider (OpenAI, Anthropic, Google vb.)
 - Telemetry / analytics / tracking
 - Otomatik güncelleme kontrolü
 - Crash report upload
 - CDN asset yükleme
 - Runtime model download (model eksikse Setup Wizard'a yönlendir)
+
+### Localhost-Only HTTP Client (httpx)
+
+> **Sprint 8 :** `httpx` artık runtime'da **mevcuttur** ancak yalnızca
+> yerel llama-server sidecar ile iletişim için kullanılır.
+
+| Kural | Değer |
+|:------|:------|
+| İzin verilen hedef | Yalnızca `http://127.0.0.1:<port>` ve `http://localhost:<port>` |
+| Yasaklanan hedefler | `http://0.0.0.0`, LAN IP'leri, public IP'ler, `https://api.openai.com`, tüm dış domainler |
+| Enforasyon | `LocalLlamaServerProvider` constructor'ında hostname doğrulanır — uzak URL'ler `ValueError` ile reddedilir |
+| "OpenAI-compatible" | Yalnızca yerel JSON/API formatı anlamına gelir — OpenAI bulut hizmeti değil |
+| Base64 loglama | **Yasak** — görüntü/ses verileri asla loglanmaz, sadece metadata (boyut, kaynak, endpoint) |
+| Sidecar bind | llama-server daima `--host 127.0.0.1` ile başlatılır — `0.0.0.0` yasak |
 
 ### İzin Verilen Outbound (Sadece Setup)
 

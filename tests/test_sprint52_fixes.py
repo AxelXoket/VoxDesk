@@ -235,10 +235,11 @@ class TestP3FrontendFixes:
         assert "onclick=\"window.VoxChat" not in source, \
             "Inline onclick XSS vector still present"
 
-    def test_lightbox_uses_data_attribute(self):
-        """Images must use data-lightbox-index for safe click handling."""
+    def test_lightbox_no_inline_onclick(self):
+        """Lightbox must NOT use inline onclick (no attachment flow in Sprint 6)."""
         source = Path("frontend/js/chat.js").read_text(encoding="utf-8")
-        assert "data-lightbox-index" in source
+        assert "onclick=" not in source, \
+            "Inline onclick still present in chat.js"
 
     def test_send_button_disabled_during_streaming(self):
         """BUG-058/090: Send button must be disabled during streaming."""
@@ -268,11 +269,10 @@ class TestP3FrontendFixes:
         assert "ttsToggle" in source
         assert "toggleTts" in source
 
-    def test_va_toggle_has_change_handler(self):
-        """BUG-067: vaToggle must have change event listener."""
+    def test_va_toggle_removed_from_settings(self):
+        """Sprint 7.2b: vaToggle removed — settings.js must not reference it."""
         source = Path("frontend/js/settings.js").read_text(encoding="utf-8")
-        assert "vaToggle" in source
-        assert "toggleVoiceActivation" in source
+        assert "vaToggle" not in source, "vaToggle still in settings.js"
 
 
 # ══════════════════════════════════════════════════════════════
@@ -309,12 +309,15 @@ class TestP4Infrastructure:
         assert '"/voice-activation/toggle"' in source
 
     def test_put_model_documented_as_stub(self):
-        """BUG-048: PUT /model must be documented as stub."""
+        """BUG-048 : PUT /model must be documented as not implemented."""
         source = Path("src/routes/settings.py").read_text(encoding="utf-8")
         model_pos = source.find("async def update_model")
         assert model_pos > 0
-        context = source[model_pos:model_pos+200]
-        assert "stub" in context.lower() or "not yet implemented" in context.lower()
+        context = source[model_pos:model_pos+300].lower()
+        assert ("stub" in context or
+                "not yet implemented" in context or
+                "not_implemented" in context or
+                "501" in context)
 
 
 # ══════════════════════════════════════════════════════════════

@@ -55,8 +55,9 @@ class TestConfigDefaults:
         assert cfg.mmproj_path is None
         assert cfg.n_gpu_layers == -1
         assert cfg.n_ctx == 8192
-        assert cfg.temperature == 0.7
-        assert cfg.max_tokens == 2048
+        assert cfg.temperature == 0.4       # Aligned with default.yaml
+        assert cfg.max_tokens == 512        # Aligned with default.yaml
+        assert cfg.repeat_penalty == 1.15   # Aligned with default.yaml
         assert cfg.context_messages == 10
 
     def test_tts_defaults(self):
@@ -65,7 +66,7 @@ class TestConfigDefaults:
         assert cfg.voice == "af_heart"
         assert cfg.speed == 1.0
         assert cfg.lang_code == "a"
-        assert cfg.enabled is True
+        assert cfg.enabled is True  # TTS always enabled by default
 
     def test_stt_defaults(self):
         cfg = STTConfig()

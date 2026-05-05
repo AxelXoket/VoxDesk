@@ -8,6 +8,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 from fastapi import APIRouter
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from src.config import get_config, reload_config, load_personality, PERSONALITIES_DIR
@@ -99,13 +100,14 @@ async def list_models():
 
 @router.put("/model")
 async def update_model(request: ModelUpdateRequest):
-    """Aktif modeli değiştir. (NOT: hot-swap henüz implement değil — stub)."""
-    from src.main import get_app_state
-    state = get_app_state()
-    if state.llm is None:
-        return {"status": "error", "message": "LLM unavailable — model file missing"}
-    state.llm.set_model(request.model)
-    return {"status": "ok", "model": request.model}
+    """Aktif modeli değiştir. (NOT : hot-swap henüz implement değil)."""
+    return JSONResponse(
+        status_code=501,
+        content={
+            "status": "not_implemented",
+            "message": "Model hot-swap is not yet available. Restart the application to change models.",
+        },
+    )
 
 
 @router.put("/tts/toggle")
@@ -123,12 +125,40 @@ async def toggle_tts():
 @router.put("/voice-activation/toggle")
 async def toggle_voice_activation():
     """Voice activation'ı aç/kapat (runtime toggle)."""
-    config = get_config()
-    current = config.voice_activation.enabled
-    object.__setattr__(config.voice_activation, "enabled", not current)
-    new_state = config.voice_activation.enabled
-    logger.info(f"Voice activation toggled: {new_state}")
+    from src.main import get_app_state
+    state = get_app_state()
+    # Sprint 8.1: Use declared AppState field instead of ad-hoc attribute
+    new_state = not state.voice_activation_enabled
+    state.voice_activation_enabled = new_state
+    logger.info(f"Voice activation toggled : {new_state}")
     return {"status": "ok", "voice_activation_enabled": new_state}
+
+
+@router.put("/screen/toggle")
+async def toggle_screen_context():
+    """Ekran yakalama ON/OFF — runtime toggle.
+
+    This is the single source of truth for screen context.
+    When OFF:
+      - /ws/screen stops sending frames
+      - chat and voice pipelines skip screen artifacts
+    """
+    from src.main import get_app_state
+    state = get_app_state()
+    # Sprint 8.1: Use declared AppState field instead of ad-hoc attribute
+    new_state = not state.screen_context_enabled
+    state.screen_context_enabled = new_state
+    logger.info(f"Screen context toggled: {new_state}")
+    return {"status": "ok", "screen_enabled": new_state}
+
+
+@router.get("/screen/status")
+async def get_screen_status():
+    """Ekran yakalama durumunu döndür."""
+    from src.main import get_app_state
+    state = get_app_state()
+    # Sprint 8.1: Use declared AppState field
+    return {"screen_enabled": state.screen_context_enabled}
 
 
 @router.get("/personalities")

@@ -1,9 +1,131 @@
 # VoxDesk — Development Progress
 
 > Tracks completed work across all development phases.
-> Last updated: 2026-04-29
+> Last updated : 2026-05-05
 
 ---
+
+## 2026-05-05 (Monday) — Sprint 8.1 : Integrity and Privacy Fixes
+
+### Sprint 7 : Voice UX ✅
+
+**Baseline :** 623 passed → 658 passed (+35) · 3 xfailed (unchanged)
+
+**Goal :**
+Implement Full Voice Mode (dedicated hands-free voice conversation) and Read-Aloud
+(assistant message TTS playback) as two independent features. Normal dictation mode
+preserved without changes.
+
+**What was done :**
+
+**Faz 1 — Backend :**
+- `POST /api/tts/read` endpoint in `src/routes/chat.py` — WAV bytes response
+- Validation : empty text → 400, oversized (>2000 chars) → 400, TTS unavailable → 503
+- No global TTS config mutation — local request processing only
+- `enable_full_voice_mode: true` feature flag in `FeaturesConfig` + `default.yaml`
+
+**Faz 2 — AudioWorklet RMS :**
+- `audio-processor.js` : RMS level computation per frame, reported every 8 frames (~21ms)
+- `audio-capture.js` : `onLevelUpdate` callback for silence detection / waveform
+
+**Faz 3 — Full Voice Mode State Machine :**
+- **New file** `frontend/js/full-voice-mode.js` — `FullVoiceMode` class
+- 7-state machine : idle → listening → user_speaking → silence_countdown → processing → ai_speaking → error
+- 3-second silence detection with `hasSpokeYet` guard (no false turn closes)
+- Turn-end beep via Web Audio API oscillator (880Hz, 80ms, vol 0.15)
+- Real-time waveform : 12 bars, RMS-driven with sinusoidal modulation
+- AI speaking state → RMS ignored (echo prevention), no barge-in
+- WebSocket session stays open between turns (no reconnect per turn)
+
+**Faz 4 — HTML + CSS :**
+- FVM overlay (`#fvmOverlay`) in chat area with close button
+- FVM sidebar toggle (`#fullVoiceToggle`) in settings panel
+- State-aware CSS : listening (cyan), speaking (green), silence (yellow), processing/AI (magenta), error (red)
+- Read-aloud button styles (`.read-aloud-btn`)
+
+**Faz 5 — Chat + App Integration :**
+- `chat.js` : Read-aloud button (🔊) on all assistant messages + after stream end
+- `app.js` : FVM init, `voice:message` guard (FVM active → dictation handler skipped)
+- `app.js` : `activeAudio` global reference — prevents TTS/read-aloud playback conflicts
+- `app.js` : `readAloud` event handler → `fetch('/api/tts/read')` → blob URL → `Audio()`
+- `app.js` : Header `#btnVoiceMode` button → FVM toggle (legacy fallback preserved)
+- `playAudioFromBase64()` global alias exposed for FVM TTS queue
+
+**Faz 6 — Tests :**
+- 35 new tests in `test_sprint7_voice_ux.py`
+- Backend : endpoint existence, validation, 503, no mutation, WAV content type
+- Frontend : RMS, FVM states, silence constants, hasSpokeYet, beep, external URL check
+- HTML : overlay, toggle, script tag, preserved elements (mic, input, screen toggle)
+- Integration : activeAudio, FVM guard, playAudioFromBase64, readAloud handler
+- Regression : get_best_frame policy, no manual upload flow
+
+**Files changed :** 11 files (2 new, 9 modified)
+- New : `frontend/js/full-voice-mode.js`, `tests/test_sprint7_voice_ux.py`
+- Backend : `src/routes/chat.py`, `src/config.py`, `config/default.yaml`
+- Frontend : `audio-processor.js`, `audio-capture.js`, `chat.js`, `app.js`, `index.html`, `styles.css`
+
+---
+
+## 2026-05-04 (Sunday) — Sprint 6.1 : Screen Context Policy Unification
+
+### Sprint 6.1 : Unified Screen Context ✅
+
+**Baseline :** 594 passed → 623 passed (+29) · 3 xfailed (unchanged)
+
+**Product Decision :**
+Screen context is automatic backend behavior, not manual screenshot attachment.
+When ON, every text/voice request gets backend-selected screen context.
+When OFF, no image artifact is created or sent to LLM.
+
+**What was done :**
+
+**Task 1 — voice_v2 Screen Artifact (C-1 CRITICAL fix) :**
+- `_process_audio_buffer` : replaced `image_bytes=None` with `get_best_frame()` → `build_artifact_from_frame()` → `image_artifact=voice_artifact`
+- `_handle_legacy_audio` : same fix applied
+- Module docstring updated to reflect unified screen context policy
+- 6 new regression tests in `test_sprint6_context.py`
+
+**Task 2 — Frame Selection Normalization :**
+- `chat.py` HTTP `/chat` : `get_latest_frame()` → `get_best_frame()`
+- `chat.py` WS `/ws/chat` : `grab_now()` → `get_best_frame()`
+- `chat.py` WS `/ws/voice` : `grab_now()` → `get_best_frame()`
+- `capture.py` `grab_now()` : dxcam-first with PIL fallback (was PIL-only)
+- Stale ring buffer fallback now logged as warning with age info
+- 5 new regression tests
+
+**Task 3 — Frontend Alignment :**
+- Removed `handleFiles()`, `processImage()`, `renderAttachments()` from `chat.js`
+- Removed `this.attachments`, `this.MAX_ATTACHMENTS`, `this.MAX_IMAGE_WIDTH` state
+- Removed drag-drop, paste-image, upload button event listeners
+- Removed `attachments` parameter from `websocket.js:sendChat()`
+- Removed upload button, file input, drop overlay, attachment strip from `index.html`
+- `addMessage()` no longer accepts `imagePreviews` parameter
+- 8 new regression tests
+
+**Task 4 — API Honesty :**
+- `PUT /model` : returns HTTP 501 Not Implemented (was fake 200 OK)
+- `PUT /voice-activation/toggle` : uses `AppState._voice_activation_enabled` runtime flag (was `object.__setattr__` Pydantic bypass)
+- 3 new regression tests
+
+**Task 5 — Dead Code Cleanup :**
+- Removed `_bg_visual_memo()` method from `provider.py` (never called)
+- Removed `_last_visual_memo` field from `LlamaCppProvider.__init__`
+- Removed `VISUAL_MEMO_PROMPT` import from `provider.py`
+- Removed `last_visual_memo` from `health()` response
+- Preserved `ChatMessage.visual_memo` and `VISUAL_MEMO_PROMPT` in `types.py` (used by history/export/tests)
+- 4 new regression tests
+
+**Task 6 — SecurityConfig :**
+- `audio_protocol.py` already reads `max_ws_frame_bytes` from `SecurityConfig` via `get_max_frame_bytes()` — verified and tested
+- Remaining SecurityConfig fields documented as backlog
+
+**Task 7 — Tests :**
+- 29 new tests in `test_sprint6_context.py`
+- 2 existing tests updated in `test_sprint52_fixes.py` (lightbox, model stub)
+- Final : 623 passed, 3 xfailed, 0 failed
+
+---
+
 
 ## 2026-04-25 (Friday) — Pre-Sprint Foundation
 
@@ -681,3 +803,59 @@ End-to-end voice pipeline: Mic → STT → Translator → LLM → TTS → Speake
 **Backlog:**
 - `stt_translated` frontend event handler (3 xfail tests await implementation).
 - Qwen3-VL JamePeng fork test venv build (pending user approval).
+
+---
+
+### Sprint 8 — Local Gemma4 Sidecar Integration (2026-05-04)
+
+**Goal:** Migrate LLM inference from in-process llama-cpp-python to a local llama-server sidecar for Gemma4 vision support.
+
+**What was done:**
+- `LocalLlamaServerProvider` — OpenAI-compatible HTTP client via httpx, localhost-only (`http://127.0.0.1`)
+- `SidecarManager` — subprocess lifecycle (auto-start, health-check, graceful shutdown) for llama-server.exe
+- `LocalLlamaServerConfig` — Pydantic config model with model/mmproj/executable paths, port, inference params
+- Lifespan integration — sidecar starts at app startup, stops at shutdown
+- `/api/status` extended with `llm_provider`, `sidecar`, `has_vision` fields
+- Gemma4 uncensored model downloaded: `Gemma-4-E4B-Uncensored-HauhauCS-Aggressive-Q8_K_P.gguf` + mmproj f16
+- Privacy: base64 image data never logged, remote URLs rejected at constructor, `0.0.0.0` binding forbidden
+- `config/default.yaml` switched from `llama-cpp` to `local-llama-server` provider
+- `test_sprint8_local_server.py` — regression tests for provider, sidecar config, localhost enforcement
+
+**Architecture decision:**
+- "OpenAI-compatible" = local JSON API format only, NOT OpenAI cloud
+- Sidecar uses libmtmd for vision (mmproj) — `Gemma4ChatHandler` in llama-cpp-python is no longer a blocker
+- Dev executable path: Docker Desktop's llama-server.exe (temporary, documented as dev-only)
+- Production: bundled llama-server.exe next to VoxDesk.exe
+
+---
+
+### Sprint 8.1 — Codebase Integrity, Privacy, State Truthfulness, Documentation (2026-05-05)
+
+**Root Cause: Full codebase integrity audit identified 23 findings across 5 severity levels.**
+
+**Critical Fixes:**
+- **C-02 PRIVACY FIX**: Legacy `/ws/voice` route now respects `screen_context_enabled`. Previously, this route always sent screen artifacts to LLM even when screen capture was toggled OFF — violating the privacy contract. All 4 voice/chat paths now enforce the same policy.
+- **C-01 STATE FIX**: `_screen_context_enabled` and `_voice_activation_enabled` are now declared fields in `AppState` dataclass instead of ad-hoc attributes set via `setattr/getattr`. All consumers updated to use direct field access.
+
+**High/Medium Fixes:**
+- `httpx>=0.27.0` added to `requirements.txt` and `pyproject.toml` as explicit runtime dependency.
+- `MetricsCollector` now pre-registers `model_loaded_llm` and `model_loaded_translator` flags — previously silently dropped by `set_flag()`.
+- `HistoryConfig.auto_save` and `save_path` marked as BACKLOG in config comments — prevents users from thinking they work.
+- All `getattr(state, '_screen_context_enabled', True)` patterns replaced with `state.screen_context_enabled`.
+- All `getattr(state, '_voice_activation_enabled', ...)` patterns replaced with `state.voice_activation_enabled`.
+
+**Documentation Updates:**
+- `security_privacy_policy.md`: Corrected false claim that httpx is absent at runtime. Now documents localhost-only sidecar usage with explicit security table.
+- `architecture.md`: Updated voice pipeline (translator disabled by default), fixed stale test counts to approximate ranges, updated `/api/status` JSON example with Sprint 8.1 fields.
+- `dependency_matrix.md`: Model quant references verified against `default.yaml`.
+- `progress.md`: This entry.
+
+**Tests Added:**
+- `test_sprint81_integrity.py`: Comprehensive regression tests for all Sprint 8.1 fixes.
+
+**Backlog (remaining from audit):**
+- `voice_v2._handle_legacy_audio` duplicates `_process_audio_buffer` pipeline — TODO for shared extraction.
+- `check_origin()` allows missing Origin header — acceptable for localhost-only app, documented.
+- POST `/api/chat` consumes pinned frame silently — low priority.
+- EXE packaging: `executable_path` still points to dev Docker path — documented as dev-only.
+- Full installer/packaging not implemented this sprint.

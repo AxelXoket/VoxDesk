@@ -191,18 +191,41 @@ class ScreenCapture:
 
     def grab_now(self, profile: str = "inference") -> CapturedFrame | None:
         """
-        Anlık frame yakala — CPU tabanlı (PIL ImageGrab).
+        Anlık frame yakala — dxcam-first, PIL fallback.
         Default: inference profili (1920/Q92) — LLM inference için.
         profile="preview" ile düşük kalite de alınabilir.
+
+        Priority:
+          1. dxcam camera (if available & running) — GPU capture
+          2. PIL ImageGrab — CPU fallback
+          3. Ring buffer latest — stale fallback (logged)
         """
+        # 1. dxcam — preferred path
+        if self._camera is not None and self._running:
+            try:
+                frame = self._camera.grab()
+                if frame is not None:
+                    img = Image.fromarray(frame)
+                    return self._encode_frame(img, profile=profile, source="grab_now")
+            except Exception as e:
+                logger.warning(f"dxcam grab failed, trying PIL fallback: {e}")
+
+        # 2. PIL ImageGrab — CPU fallback
         try:
             from PIL import ImageGrab
             img = ImageGrab.grab()
             return self._encode_frame(img, profile=profile, source="grab_now")
         except Exception as e:
-            logger.error(f"CPU grab failed: {e}")
-            # Fallback to ring buffer
-            return self.get_latest_frame()
+            logger.error(f"CPU grab also failed: {e}")
+
+        # 3. Stale ring buffer fallback — clearly marked
+        latest = self.get_latest_frame()
+        if latest:
+            logger.warning(
+                f"grab_now: returning stale ring buffer frame "
+                f"(age={time.time() - latest.timestamp:.1f}s, source={latest.source})"
+            )
+        return latest
 
     # ── Pin Mechanism ─────────────────────────────────────────
     # Hotkey ile mevcut frame'i "pinle" — sekme değişince kaybolmasın
