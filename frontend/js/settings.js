@@ -59,6 +59,7 @@ class VoxSettings {
             const data = await res.json();
 
             this.modelSelect.value = data.model;
+            this._currentModel = data.model;
             this.voiceSelect.value = data.voice;
             this.speedSlider.value = data.tts_speed;
             this.speedValue.textContent = `${data.tts_speed}x`;
@@ -143,13 +144,25 @@ class VoxSettings {
     }
 
     async updateModel() {
+        const previousModel = this._currentModel || this.modelSelect.value;
         try {
-            await fetch('/api/model', {
+            const res = await fetch('/api/model', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ model: this.modelSelect.value }),
             });
-        } catch (e) { /* silent */ }
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                const msg = data.message || 'Model değiştirilemedi.';
+                alert(`⚠️ ${msg}`);
+                this.modelSelect.value = previousModel;
+            } else {
+                this._currentModel = this.modelSelect.value;
+            }
+        } catch (e) {
+            alert('⚠️ Model değiştirme hatası: ' + e.message);
+            this.modelSelect.value = previousModel;
+        }
     }
 
     async toggleTts() {

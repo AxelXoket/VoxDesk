@@ -1,7 +1,56 @@
 # VoxDesk — Development Progress
 
 > Tracks completed work across all development phases.
-> Last updated : 2026-05-05
+> Last updated : 2026-05-26
+
+---
+
+## 2026-05-26 (Monday) — Clearance Stage Blocker Fixes
+
+### Clearance Stage Fixes : F-01, F-07, F-03, F-11 ✅
+
+**Baseline :** 765 passed → 776 passed (+11) · 3 xfailed (unchanged)
+
+**Context :** Four blockers identified in the Clearance Stage Audit (verified by crosscheck) were implemented as a surgical, no-new-features patch.
+
+**What was done :**
+
+**F-01 — POST /api/chat must respect screen_context_enabled :**
+- `src/routes/chat.py` — Added `state.screen_context_enabled` to the image artifact guard in the HTTP `/api/chat` handler.
+- Previously: `if request.include_screen and state.capture:` allowed screen artifacts to bypass the privacy toggle.
+- After: `if request.include_screen and state.screen_context_enabled and state.capture:` — now matches the WS chat guard exactly.
+- No change to WS chat, voice routes, or any other path.
+
+**F-07 — POST /api/history/export must not leak absolute filesystem path :**
+- `src/routes/history.py` — Changed `str(filename)` → `filename.name` in the export response.
+- The file is still saved to the full path on disk; only the returned `"file"` field in the JSON response changed.
+- Frontend alert still works — displays just the filename (e.g. `voxdesk_history_20260526_210000.json`).
+- Server log (`logger.info`) still records the full path internally.
+
+**F-03 — Model select must not silently fail on PUT /api/model 501 :**
+- `frontend/js/settings.js` — `updateModel()` now checks `res.ok`, shows `alert()` with the backend's message on failure, and reverts the selector to the previously active model.
+- `_currentModel` tracking added: seeded from `loadSettings()`, updated only on successful response.
+- Backend `PUT /api/model` still correctly returns HTTP 501 (unchanged).
+- No fake success path exists anymore.
+
+**F-11 — Sidecar is_healthy must not stay stale after process crash :**
+- `src/llm/sidecar.py` — `is_healthy` property updated to check `_process.poll()` when a process was spawned by VoxDesk.
+- Previously: `return self._healthy` — remained True even if the llama-server process exited.
+- After: returns False if `_process is not None and _process.poll() is not None` (process exited).
+- Port-reuse mode (`_process=None`) preserves previous behavior: `is_healthy` driven by `_healthy` flag alone.
+- `/api/status` `"sidecar": { "healthy": ... }` now reflects truthful process state.
+
+**Tests Added :**
+- `tests/test_clearance_fixes.py` — 11 new tests: static source guards + runtime async tests for F-01/F-07, static JS source checks for F-03, unit tests for all 4 F-11 cases.
+- `tests/test_sprint6_context.py` — 1 assertion updated: `test_screen_context_off_means_no_artifact` now checks the corrected guard string.
+
+**Post-implementation review verdict :** SAFE_AFTER_DOCS
+
+**Files changed :** 6 files (1 new, 5 modified)
+- New: `tests/test_clearance_fixes.py`
+- Backend: `src/routes/chat.py`, `src/routes/history.py`, `src/llm/sidecar.py`
+- Frontend: `frontend/js/settings.js`
+- Tests: `tests/test_sprint6_context.py`
 
 ---
 

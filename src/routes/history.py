@@ -61,4 +61,4 @@ async def export_history():
         json.dump(history, f, ensure_ascii=False, indent=2)
 
     logger.info(f"💾 Geçmiş kaydedildi: {filename}")
-    return {"status": "ok", "file": str(filename), "messages": len(history)}
+    return {"status": "ok", "file": filename.name, "messages": len(history)}

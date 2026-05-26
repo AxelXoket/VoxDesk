@@ -173,7 +173,12 @@ class SidecarManager:
 
     @property
     def is_healthy(self) -> bool:
-        return self._healthy
+        if not self._healthy:
+            return False
+        # If we spawned a process, it must still be running
+        if self._process is not None and self._process.poll() is not None:
+            return False
+        return True
 
     @property
     def is_running(self) -> bool:

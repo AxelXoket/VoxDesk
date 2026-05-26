@@ -8,7 +8,7 @@
     <img src="https://img.shields.io/badge/license-GPL--3.0-blue?style=flat-square" alt="License">
     <img src="https://img.shields.io/badge/version-0.7.2-orange?style=flat-square" alt="Version">
     <img src="https://img.shields.io/badge/privacy-100%25_local-brightgreen?style=flat-square" alt="Privacy">
-    <img src="https://img.shields.io/badge/tests-764_passed-success?style=flat-square" alt="Tests">
+    <img src="https://img.shields.io/badge/tests-776_passed-success?style=flat-square" alt="Tests">
     <img src="https://img.shields.io/badge/CUDA-12.8-76B900?style=flat-square&logo=nvidia&logoColor=white" alt="CUDA">
   </p>
 </p>

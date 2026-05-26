@@ -109,7 +109,7 @@ async def chat(request: ChatRequest):
 
     image_artifact = None
 
-    if request.include_screen and state.capture:
+    if request.include_screen and state.screen_context_enabled and state.capture:
         frame = state.capture.get_best_frame()
         if frame:
             from src.image_artifact import build_artifact_from_frame

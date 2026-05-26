@@ -288,7 +288,7 @@ class TestPrivacyRegression:
 
     @pytest.mark.regression
     def test_screen_context_off_means_no_artifact(self):
-        """When include_screen is False, no artifact should be created."""
+        """When screen_context_enabled is False, no artifact should be created."""
         source = Path("src/routes/chat.py").read_text(encoding="utf-8")
-        # HTTP path: "if request.include_screen and state.capture"
-        assert "include_screen and state.capture" in source
+        # HTTP path: must check screen_context_enabled before capture
+        assert "include_screen and state.screen_context_enabled and state.capture" in source
