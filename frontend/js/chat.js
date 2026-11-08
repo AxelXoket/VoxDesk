@@ -1,5 +1,5 @@
 /**
- * VoxDesk — Chat Component
+ * VoxDesk - Chat Component
  * Mesaj gönderme, streaming response, typing indicator.
  * Multimodal: file upload, drag & drop, paste, pin indicator.
  */
@@ -38,7 +38,7 @@ class VoxChat {
 
         this.inputEl.addEventListener('input', () => this.autoResize());
 
-        // Screen context toggle (ON/OFF — backend is source of truth)
+        // Screen context toggle (ON/OFF - backend is source of truth)
         this.alwaysOnToggle.addEventListener('change', async () => {
             this.includeScreen = this.alwaysOnToggle.checked;
             window.voxScreenEnabled = this.includeScreen;
@@ -120,7 +120,7 @@ class VoxChat {
         this.inputEl.value = '';
         this.autoResize();
 
-        // Send via WS — screen context is backend-driven, no attachments
+        // Send via WS - screen context is backend-driven, no attachments
         window.voxWs.sendChat(text, this.includeScreen);
 
         // Clear pin indicator (if any)

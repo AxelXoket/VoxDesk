@@ -1,14 +1,14 @@
 /**
- * VoxDesk — AudioWorklet Processor
+ * VoxDesk - AudioWorklet Processor
  * Float32 → Int16 PCM dönüşümü ve binary WebSocket transfer.
- * Sprint 7 : RMS level hesabı — silence detection ve waveform görselleştirme.
+ * Sprint 7 : RMS level hesabı - silence detection ve waveform görselleştirme.
  *
  * Bu dosya AudioWorkletGlobalScope'ta çalışır (main thread DIŞI).
  * getUserMedia'dan gelen Float32 audio'yu Int16 PCM'e çevirir
  * ve main thread'e port.postMessage ile gönderir.
  *
  * Güvenlik:
- *   - Tüm işlem localhost'ta — dış domain yok
+ *   - Tüm işlem localhost'ta - dış domain yok
  *   - Audio data disk'e yazılmaz
  *   - External fetch/import yok
  */
@@ -18,7 +18,7 @@ class AudioProcessor extends AudioWorkletProcessor {
         super();
         this._active = true;
 
-        // Sprint 7: RMS accumulator — her 8 frame'de bir rms_level gönder
+        // Sprint 7: RMS accumulator - her 8 frame'de bir rms_level gönder
         this._rmsAccum = 0;
         this._frameCount = 0;
         this._RMS_REPORT_INTERVAL = 8; // 8 × 128 samples ≈ 21ms
@@ -66,9 +66,9 @@ class AudioProcessor extends AudioWorkletProcessor {
         this.port.postMessage({
             type: 'pcm_data',
             buffer: pcmData.buffer,
-        }, [pcmData.buffer]); // Transfer ownership — zero-copy
+        }, [pcmData.buffer]); // Transfer ownership - zero-copy
 
-        // Sprint 7: RMS level — her _RMS_REPORT_INTERVAL frame'de bir raporla
+        // Sprint 7: RMS level - her _RMS_REPORT_INTERVAL frame'de bir raporla
         const frameRms = Math.sqrt(sumSquares / channelData.length);
         this._rmsAccum += frameRms;
         this._frameCount++;

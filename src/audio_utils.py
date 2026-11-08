@@ -1,5 +1,5 @@
 """
-VoxDesk — Audio Decode Utilities
+VoxDesk - Audio Decode Utilities
 WebM/Opus ve raw PCM decode fonksiyonları.
 chat.py ve voice_v2.py tarafından paylaşılır.
 
@@ -21,7 +21,7 @@ logger = logging.getLogger("voxdesk.audio_utils")
 def decode_audio_webm(audio_bytes: bytes) -> "np.ndarray | None":
     """
     WebM/Opus audio'yu float32 16kHz PCM numpy array'e dönüştür.
-    PyAV (libavcodec) kullanır — ffmpeg CLI çağırmaz.
+    PyAV (libavcodec) kullanır - ffmpeg CLI çağırmaz.
     """
     import numpy as np
 

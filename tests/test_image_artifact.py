@@ -1,5 +1,5 @@
 """
-VoxDesk — Sprint 5.3 Part 2 Tests
+VoxDesk - Sprint 5.3 Part 2 Tests
 Canonical Image Artifact: validation, factories, provider integration.
 """
 
@@ -140,7 +140,7 @@ class TestArtifactFromUpload:
         assert art.mime_type == "image/png"
 
     def test_no_recompress(self):
-        """Upload bytes are preserved exactly — no re-encoding."""
+        """Upload bytes are preserved exactly - no re-encoding."""
         jpeg = _jpeg(640, 480, 92)
         art = build_artifact_from_upload(jpeg)
         assert art.image_bytes is jpeg  # identity check
@@ -198,7 +198,7 @@ class TestExifDetection:
 class TestHistoryPolicy:
 
     def test_history_no_image_stored(self):
-        """Conversation history stores only text — no image/base64."""
+        """Conversation history stores only text - no image/base64."""
         from src.llm.history import ConversationHistory
         h = ConversationHistory()
         h.add_user_message("test with image")

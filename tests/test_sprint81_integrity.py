@@ -1,5 +1,5 @@
 """
-VoxDesk — Sprint 8.1 Integrity Tests
+VoxDesk - Sprint 8.1 Integrity Tests
 Tests for all audit-driven fixes: privacy, state truthfulness, dependencies, docs.
 """
 
@@ -86,7 +86,7 @@ class TestScreenContextEnforcement:
         # Find the ws_voice function and verify it checks screen_context_enabled
         voice_section = content[content.index("async def ws_voice("):]
         assert "screen_context_enabled" in voice_section, (
-            "Legacy /ws/voice does NOT check screen_context_enabled — PRIVACY GAP"
+            "Legacy /ws/voice does NOT check screen_context_enabled - PRIVACY GAP"
         )
 
     @pytest.mark.regression
@@ -416,7 +416,7 @@ class TestSidecarConfigSafety:
         with open(yaml_path, "r", encoding="utf-8") as f:
             cfg = yaml.safe_load(f)
         assert cfg["local_llama_server"]["executable_path"] == "", (
-            "executable_path must be empty in committed config — no personal paths"
+            "executable_path must be empty in committed config - no personal paths"
         )
 
 

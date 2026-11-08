@@ -1,5 +1,5 @@
 """
-VoxDesk — Canonical Image Artifact
+VoxDesk - Canonical Image Artifact
 Turn-scoped, validated image container for LLM inference.
 All image sources (upload, capture, pin, voice) produce the same artifact.
 
@@ -37,7 +37,7 @@ MIME_MAP = {
 
 
 class ImageValidationError(ValueError):
-    """Image doğrulama hatası — invalid format, size, dimension."""
+    """Image doğrulama hatası - invalid format, size, dimension."""
     def __init__(self, message: str, code: str = "IMAGE_DECODE_FAILED"):
         super().__init__(message)
         self.code = code
@@ -146,7 +146,7 @@ def build_artifact_from_upload(
 ) -> CanonicalImageArtifact:
     """
     Upload image bytes → CanonicalImageArtifact.
-    Recompress YAPMAZ — orijinal bytes korunur.
+    Recompress YAPMAZ - orijinal bytes korunur.
     EXIF detect edilir ama auto-normalize yapılmaz (Part 2 kararı).
     """
     valid, err = validate_image(image_bytes)
@@ -156,7 +156,7 @@ def build_artifact_from_upload(
     fmt = _detect_image_format(image_bytes)
     has_exif = _check_exif_orientation(image_bytes)
     if has_exif:
-        logger.info("Upload image has EXIF orientation tag — not auto-normalized (Part 2 flag only)")
+        logger.info("Upload image has EXIF orientation tag - not auto-normalized (Part 2 flag only)")
 
     metadata = build_image_metadata(
         source="upload",

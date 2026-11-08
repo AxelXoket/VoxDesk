@@ -1,7 +1,7 @@
 """
-VoxDesk — Chat + Voice API Routes
+VoxDesk - Chat + Voice API Routes
 Metin chat, ekran analizi, sesli sohbet.
-Tüm pipeline non-blocking — event loop'u dondurmaz.
+Tüm pipeline non-blocking - event loop'u dondurmaz.
 """
 
 from __future__ import annotations
@@ -40,7 +40,7 @@ class TTSReadRequest(BaseModel):
 @router.post("/tts/read")
 async def tts_read(request: TTSReadRequest):
     """
-    Read-aloud endpoint — text'i TTS ile sese çevirir.
+    Read-aloud endpoint - text'i TTS ile sese çevirir.
     Sprint 7 : Normal chat'te assistant mesajlarını sesli okumak için.
     Global TTS config'i mutate etmez.
     """
@@ -95,14 +95,14 @@ async def tts_read(request: TTSReadRequest):
 
 @router.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
-    """Metin tabanlı chat — async, non-blocking."""
+    """Metin tabanlı chat - async, non-blocking."""
     from src.main import get_app_state
 
     state = get_app_state()
 
     if state.llm is None:
         return ChatResponse(
-            response="LLM unavailable — local model file missing. Please place GGUF files under models/.",
+            response="LLM unavailable - local model file missing. Please place GGUF files under models/.",
             model=None,
             has_image=False,
         )
@@ -115,7 +115,7 @@ async def chat(request: ChatRequest):
             from src.image_artifact import build_artifact_from_frame
             image_artifact = build_artifact_from_frame(frame)
 
-    # Async chat — event loop'u bloke etmez
+    # Async chat - event loop'u bloke etmez
     response_text = await state.llm.chat(request.message, image_artifact=image_artifact)
 
     return ChatResponse(
@@ -169,7 +169,7 @@ async def ws_chat(websocket: WebSocket):
                 except Exception as att_err:
                     logger.error(f"Attachment decode error: {att_err}")
 
-            # 2. Pinned frame (hotkey capture — sekme değişmeden önce alınmış)
+            # 2. Pinned frame (hotkey capture - sekme değişmeden önce alınmış)
             if image_artifact is None and state.capture and state.capture.has_pin:
                 frame = state.capture.get_pinned_frame()
                 if frame:
@@ -178,7 +178,7 @@ async def ws_chat(websocket: WebSocket):
                     state.capture.clear_pin()
                     logger.info("📌 Pinned frame artifact created")
 
-            # 3. Always-on screen capture — get_best_frame() (pin > ring buffer)
+            # 3. Always-on screen capture - get_best_frame() (pin > ring buffer)
             # Sprint 8.1: Use declared AppState field
             if image_artifact is None and include_screen and state.screen_context_enabled and state.capture:
                 frame = state.capture.get_best_frame()
@@ -191,7 +191,7 @@ async def ws_chat(websocket: WebSocket):
                 await state.ws_manager.send_json(websocket, {
                     "type": "error",
                     "code": "LLM_UNAVAILABLE",
-                    "message": "LLM unavailable — local model file missing.",
+                    "message": "LLM unavailable - local model file missing.",
                     "recoverable": True,
                 })
                 continue
@@ -234,7 +234,7 @@ async def ws_chat(websocket: WebSocket):
 
 @router.websocket("/ws/screen")
 async def ws_screen(websocket: WebSocket):
-    """Live screen preview — binary frame gönderimi (CPU tasarrufu)."""
+    """Live screen preview - binary frame gönderimi (CPU tasarrufu)."""
     from src.main import get_app_state
 
     state = get_app_state()
@@ -246,7 +246,7 @@ async def ws_screen(websocket: WebSocket):
 
     try:
         while True:
-            # Sprint 8.1: Honor runtime screen toggle — declared AppState field
+            # Sprint 8.1: Honor runtime screen toggle - declared AppState field
             if state.capture and state.screen_context_enabled:
                 frame = state.capture.get_latest_frame()
                 # Sadece yeni frame varsa gönder (duplicate skip)
@@ -262,7 +262,7 @@ async def ws_screen(websocket: WebSocket):
                             "height": frame.height,
                         })
                     except Exception:
-                        # Sprint 3.6: Socket kapanmış — cleanup and break
+                        # Sprint 3.6: Socket kapanmış - cleanup and break
                         break
             await asyncio.sleep(1.0)
 
@@ -279,7 +279,7 @@ from src.audio_utils import decode_audio_webm, decode_audio_raw_pcm
 @router.websocket("/ws/voice")
 async def ws_voice(websocket: WebSocket):
     """
-    Sesli chat — full async pipeline:
+    Sesli chat - full async pipeline:
     Client audio → decode → STT → LLM (async) → TTS (streaming) → Client
     """
     from src.main import get_app_state
@@ -346,8 +346,8 @@ async def ws_voice(websocket: WebSocket):
                 # Voice mode: LLM handles multilingual natively, no translator needed
                 llm_input = text
 
-                # 3. Screen capture — voice mode'da da get_best_frame() kullan
-                # Sprint 8.1: Respect screen_context_enabled (PRIVACY FIX — C-02)
+                # 3. Screen capture - voice mode'da da get_best_frame() kullan
+                # Sprint 8.1: Respect screen_context_enabled (PRIVACY FIX - C-02)
                 voice_artifact = None
                 if state.screen_context_enabled and state.capture:
                     frame = state.capture.get_best_frame()
@@ -359,7 +359,7 @@ async def ws_voice(websocket: WebSocket):
                     await state.ws_manager.send_json(websocket, {
                         "type": "error",
                         "code": "LLM_UNAVAILABLE",
-                        "message": "LLM unavailable — local model file missing.",
+                        "message": "LLM unavailable - local model file missing.",
                         "recoverable": True,
                     })
                     continue
@@ -371,7 +371,7 @@ async def ws_voice(websocket: WebSocket):
                     "text": llm_response,
                 })
 
-                # 4. TTS — streaming, executor'da çalışır (blocking)
+                # 4. TTS - streaming, executor'da çalışır (blocking)
                 if state.tts and state.tts.enabled:
                     try:
                         import soundfile as sf

@@ -1,5 +1,5 @@
 """
-VoxDesk — Settings API Routes
+VoxDesk - Settings API Routes
 Yapılandırma, model, kişilik, ses profili yönetimi.
 """
 
@@ -136,7 +136,7 @@ async def toggle_voice_activation():
 
 @router.put("/screen/toggle")
 async def toggle_screen_context():
-    """Ekran yakalama ON/OFF — runtime toggle.
+    """Ekran yakalama ON/OFF - runtime toggle.
 
     This is the single source of truth for screen context.
     When OFF:
@@ -192,7 +192,7 @@ async def set_personality(name: str):
             state.llm.set_personality(personality)
         if state.tts and personality.voice:
             state.tts.set_voice(personality.voice)
-        # Sprint 5.1: STT domain vocabulary — personality'ye bağlı
+        # Sprint 5.1: STT domain vocabulary - personality'ye bağlı
         if state.stt and hasattr(state.stt, 'set_initial_prompt'):
             state.stt.set_initial_prompt(personality.stt_context)
         return {"status": "ok", "personality": personality.name}

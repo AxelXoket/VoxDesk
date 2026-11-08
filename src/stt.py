@@ -1,5 +1,5 @@
 """
-VoxDesk — Speech-to-Text Module
+VoxDesk - Speech-to-Text Module
 faster-whisper ile Türkçe+İngilizce ses tanıma.
 Push-to-talk, toggle continuous, voice activation destekli.
 ManagedModel lifecycle entegrasyonu ile güvenli VRAM yönetimi.
@@ -56,7 +56,7 @@ class SpeechRecognizer:
         self._is_listening = False
         self._stream = None
 
-        # Lifecycle — ManagedModel composition
+        # Lifecycle - ManagedModel composition
         self._lifecycle = _STTLifecycle(
             owner=self,
             name="stt",
@@ -75,9 +75,9 @@ class SpeechRecognizer:
         Returns:
             dict: {"text": str, "language": str, "segments": list}
         """
-        # Ref count guard — aktif transcribe sırasında unload engellensin
+        # Ref count guard - aktif transcribe sırasında unload engellensin
         if not self._lifecycle.acquire():
-            logger.error("STT model hazır değil — transcribe iptal")
+            logger.error("STT model hazır değil - transcribe iptal")
             return {"text": "", "language": "error", "segments": []}
 
         try:
@@ -120,7 +120,7 @@ class SpeechRecognizer:
             self._lifecycle.release()
 
     def _audio_callback(self, indata, frames, time_info, status):
-        """sounddevice stream callback — ses verisini kuyruğa ekle."""
+        """sounddevice stream callback - ses verisini kuyruğa ekle."""
         if status:
             logger.warning(f"Ses stream durumu: {status}")
         self._audio_queue.put(indata.copy())
@@ -192,7 +192,7 @@ class SpeechRecognizer:
         return db > self.activation_threshold_db
 
     def set_initial_prompt(self, prompt: str | None) -> None:
-        """Domain vocabulary'yi güncelle — personality değişiminde çağrılır."""
+        """Domain vocabulary'yi güncelle - personality değişiminde çağrılır."""
         self.initial_prompt = prompt or None
         logger.info(f"STT initial_prompt güncellendi: {str(self.initial_prompt)[:80]}")
 
@@ -207,7 +207,7 @@ class SpeechRecognizer:
         return self._lifecycle.safe_unload()
 
     def close(self) -> None:
-        """Shutdown cleanup — model + stream + queue."""
+        """Shutdown cleanup - model + stream + queue."""
         self.stop_listening()
         self._lifecycle.close()
 
@@ -218,11 +218,11 @@ class SpeechRecognizer:
         return h
 
     def acquire(self) -> bool:
-        """Ref count artır — aktif kullanım başlıyor."""
+        """Ref count artır - aktif kullanım başlıyor."""
         return self._lifecycle.acquire()
 
     def release(self) -> None:
-        """Ref count azalt — aktif kullanım bitti."""
+        """Ref count azalt - aktif kullanım bitti."""
         self._lifecycle.release()
 
 

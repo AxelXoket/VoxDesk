@@ -1,5 +1,5 @@
 """
-VoxDesk — LlamaCppProvider
+VoxDesk - LlamaCppProvider
 Local GGUF inference via llama-cpp-python.
 
 Runtime Policy:
@@ -48,7 +48,7 @@ class LlamaCppProvider:
         self._config = config
         self._personality: PersonalityConfig = get_config().personality
 
-        # ── Path validation — NO download, NO from_pretrained ─
+        # ── Path validation - NO download, NO from_pretrained ─
         self._model_path = self._resolve_path(config.model_path, "model_path")
         self._mmproj_path = (
             self._resolve_path(config.mmproj_path, "mmproj_path")
@@ -57,7 +57,7 @@ class LlamaCppProvider:
         )
 
         # ── Internal state ───────────────────────────────────
-        self._llm = None  # Lazy load — llama_cpp.Llama instance
+        self._llm = None  # Lazy load - llama_cpp.Llama instance
         self._history = ConversationHistory(
             context_limit=config.context_messages,
         )
@@ -78,7 +78,7 @@ class LlamaCppProvider:
     def _resolve_path(path_str: str | None, field_name: str) -> Path:
         """
         Local dosya yolunu çözümle ve varlığını doğrula.
-        Eksikse FileNotFoundError — ASLA download denemesi yok.
+        Eksikse FileNotFoundError - ASLA download denemesi yok.
         """
         if not path_str:
             raise FileNotFoundError(
@@ -97,7 +97,7 @@ class LlamaCppProvider:
 
     @property
     def model_name(self) -> str:
-        """Model dosya adı — routes ve UI'da kullanılır."""
+        """Model dosya adı - routes ve UI'da kullanılır."""
         return self._model_path.name
 
     @property
@@ -113,7 +113,7 @@ class LlamaCppProvider:
     # ── Lifecycle ─────────────────────────────────────────────
 
     def _ensure_loaded(self) -> None:
-        """Lazy model loading — ilk kullanımda GPU'ya yükle."""
+        """Lazy model loading - ilk kullanımda GPU'ya yükle."""
         if self._llm is not None:
             return
 
@@ -137,15 +137,15 @@ class LlamaCppProvider:
             "verbose": False,
         }
 
-        # Part 4b: n_ubatch — explicit override if configured
+        # Part 4b: n_ubatch - explicit override if configured
         if self._config.n_ubatch is not None:
             kwargs["n_ubatch"] = self._config.n_ubatch
 
-        # Vision support — mmproj varsa clip model + chat handler ekle
+        # Vision support - mmproj varsa clip model + chat handler ekle
         if self._mmproj_path:
             kwargs["clip_model_path"] = str(self._mmproj_path)
 
-            # Part 4b: Resolve handler name — explicit override or auto-detect
+            # Part 4b: Resolve handler name - explicit override or auto-detect
             handler_name = self._resolve_handler_name()
 
             if handler_name:
@@ -178,7 +178,7 @@ class LlamaCppProvider:
                         f"  n_ubatch={self._config.n_ubatch or 'null'}"
                     )
                 except (AttributeError, ImportError) as e:
-                    # Part 4b/5: Clear error for unavailable handlers — no silent fallback
+                    # Part 4b/5: Clear error for unavailable handlers - no silent fallback
                     if "Gemma4" in handler_name:
                         logger.error(
                             f"Gemma 4 model detected but {handler_name} is unavailable "
@@ -196,11 +196,11 @@ class LlamaCppProvider:
                             f"Falling back to auto-detect (degraded vision)."
                         )
                     else:
-                        logger.warning(f"{handler_name} not available: {e} — using auto-detect")
+                        logger.warning(f"{handler_name} not available: {e} - using auto-detect")
             else:
-                logger.warning(f"No handler mapped for {self._model_path.name} — using auto-detect")
+                logger.warning(f"No handler mapped for {self._model_path.name} - using auto-detect")
 
-        # Chat format — None ise model metadata'dan auto-detect
+        # Chat format - None ise model metadata'dan auto-detect
         if self._config.chat_format:
             kwargs["chat_format"] = self._config.chat_format
 
@@ -224,7 +224,7 @@ class LlamaCppProvider:
 
     # ── Part 4b: Handler Resolution ───────────────────────────
 
-    # Ordered pattern list — more specific patterns first
+    # Ordered pattern list - more specific patterns first
     _HANDLER_PATTERNS: list[tuple[list[str], str]] = [
         (["gemma-4", "gemma4", "e4b", "e2b"],         "Gemma4ChatHandler"),
         (["gemma-3", "gemma3", "gemma"],               "Gemma3ChatHandler"),
@@ -268,7 +268,7 @@ class LlamaCppProvider:
                 )
                 return None
 
-        # 2. Auto-detect from model name — ordered, most specific first
+        # 2. Auto-detect from model name - ordered, most specific first
         model_lower = self._model_path.name.lower()
         for patterns, handler_name in self._HANDLER_PATTERNS:
             if any(p in model_lower for p in patterns):
@@ -306,7 +306,7 @@ class LlamaCppProvider:
 
         min_tokens, max_tokens = self._VISION_BUDGET_PRESETS[preset]
 
-        # n_ubatch guard — crash prevention
+        # n_ubatch guard - crash prevention
         n_ubatch = self._config.n_ubatch
         if n_ubatch is None or n_ubatch < max_tokens:
             logger.error(
@@ -333,7 +333,7 @@ class LlamaCppProvider:
     # ── Injection ─────────────────────────────────────────────
 
     def set_metrics(self, metrics) -> None:
-        """Post-creation metrics injection — registry factory pattern'i bozmaz."""
+        """Post-creation metrics injection - registry factory pattern'i bozmaz."""
         self._metrics = metrics
 
     def set_personality(self, personality: PersonalityConfig) -> None:
@@ -344,7 +344,7 @@ class LlamaCppProvider:
     def set_model(self, model_name: str) -> None:
         """Aktif modeli değiştir (hot-swap için)."""
         # Sprint 4 PoC: path-based, ileride implement edilecek
-        logger.warning(f"set_model({model_name}) — hot-swap not yet implemented")
+        logger.warning(f"set_model({model_name}) - hot-swap not yet implemented")
 
     # ── Image Metadata (Part 1.5) ──────────────────────────────
 
@@ -377,7 +377,7 @@ class LlamaCppProvider:
         )
         log_image_context(meta)
 
-        # Debug export — flag-gated
+        # Debug export - flag-gated
         try:
             config = get_config()
             if config.features.enable_debug_capture_export:
@@ -392,13 +392,13 @@ class LlamaCppProvider:
         Kişilik profilinden modüler system prompt oluştur.
 
         Bölümler:
-          1. system_prompt     — Ana kişilik ve davranış kuralları
-          2. screen_analysis   — Ekran yorumlama talimatları
-          3. emotion_rules     — Duygu algılama/yansıtma filtresi
-          4. response_format   — Çıktı biçim kuralları
+          1. system_prompt     - Ana kişilik ve davranış kuralları
+          2. screen_analysis   - Ekran yorumlama talimatları
+          3. emotion_rules     - Duygu algılama/yansıtma filtresi
+          4. response_format   - Çıktı biçim kuralları
 
         Args:
-            response_mode: "voice" veya "text" — format kurallarını belirler
+            response_mode: "voice" veya "text" - format kurallarını belirler
         """
         p = self._personality
         sections: list[str] = []
@@ -419,7 +419,7 @@ class LlamaCppProvider:
         if p.response_format:
             sections.append(p.response_format.strip())
 
-        # 5. Mode indicator — concise, not verbose
+        # 5. Mode indicator - concise, not verbose
         if response_mode == "voice":
             sections.append("ŞU AN SES MODU: Cevabın sesli okunacak. Markdown kullanma, doğal konuş.")
 
@@ -443,7 +443,7 @@ class LlamaCppProvider:
 
         messages: list[dict] = []
 
-        # System prompt — response_mode ile mod-aware
+        # System prompt - response_mode ile mod-aware
         system_prompt = self._build_system_prompt(response_mode=response_mode)
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
@@ -455,7 +455,7 @@ class LlamaCppProvider:
                 from src.image_artifact import build_artifact_from_bytes
                 artifact = build_artifact_from_bytes(image_bytes, source=image_source)
             except Exception as e:
-                logger.warning(f"Image artifact build failed: {e} — skipping image")
+                logger.warning(f"Image artifact build failed: {e} - skipping image")
                 artifact = None
 
         # Effective image bytes for prompt logic
@@ -472,7 +472,7 @@ class LlamaCppProvider:
             # Metadata log
             log_image_context(artifact.metadata)
 
-            # Debug export — flag-gated
+            # Debug export - flag-gated
             try:
                 config = get_config()
                 if config.features.enable_debug_capture_export:
@@ -511,7 +511,7 @@ class LlamaCppProvider:
         messages: list[dict],
     ) -> dict:
         """
-        Senkron chat completion — run_in_executor ile async bridge'lenir.
+        Senkron chat completion - run_in_executor ile async bridge'lenir.
         Doğrudan çağırma; chat() veya chat_stream() kullan.
         """
         self._ensure_loaded()
@@ -527,7 +527,7 @@ class LlamaCppProvider:
         messages: list[dict],
     ):
         """
-        Senkron streaming — chunk generator döndürür.
+        Senkron streaming - chunk generator döndürür.
         Doğrudan çağırma; chat_stream() kullan.
         """
         self._ensure_loaded()
@@ -550,7 +550,7 @@ class LlamaCppProvider:
         image_artifact=None,
     ) -> str:
         """
-        Async chat — non-blocking, event loop'u dondurmaz.
+        Async chat - non-blocking, event loop'u dondurmaz.
         Sync llama-cpp → async bridge (run_in_executor).
         """
         messages = self._build_messages(message, image_bytes, response_mode, image_source, image_artifact)
@@ -571,15 +571,15 @@ class LlamaCppProvider:
             usage = response.get("usage", {})
             if usage:
                 logger.debug(
-                    f"LLM tokens — prompt: {usage.get('prompt_tokens')}, "
+                    f"LLM tokens - prompt: {usage.get('prompt_tokens')}, "
                     f"completion: {usage.get('completion_tokens')}, "
                     f"latency: {_elapsed_ms:.0f}ms"
                 )
 
-            # Response extraction — strip leading whitespace/newlines
+            # Response extraction - strip leading whitespace/newlines
             assistant_content = response["choices"][0]["message"]["content"].strip()
 
-            # History update — sadece metin sakla, image yok
+            # History update - sadece metin sakla, image yok
             self._history.add_user_message(message)
             self._history.add_assistant_message(assistant_content)
 
@@ -600,7 +600,7 @@ class LlamaCppProvider:
         image_artifact=None,
     ) -> AsyncGenerator[str, None]:
         """
-        Async streaming chat — token-by-token yield.
+        Async streaming chat - token-by-token yield.
         Sync generator → async bridge (run_in_executor + queue).
         """
         messages = self._build_messages(message, image_bytes, response_mode, image_source, image_artifact)
@@ -649,7 +649,7 @@ class LlamaCppProvider:
             if self._metrics:
                 self._metrics.record_latency("llm_latency_ms", _elapsed_ms)
 
-            # History update — sadece metin sakla, image history'de tutulmaz
+            # History update - sadece metin sakla, image history'de tutulmaz
             assistant_content = "".join(full_response)
             self._history.add_user_message(message)
             self._history.add_assistant_message(assistant_content)
@@ -678,7 +678,7 @@ class LlamaCppProvider:
     # ── Protocol Compliance ──────────────────────────────────
 
     def health(self) -> dict:
-        """Provider durum raporu — LLMProvider protocol."""
+        """Provider durum raporu - LLMProvider protocol."""
         return {
             "provider": "llama-cpp",
             "model": self._model_path.name,
@@ -688,5 +688,5 @@ class LlamaCppProvider:
         }
 
     async def aclose(self) -> None:
-        """Async resource cleanup — LLMProvider protocol."""
+        """Async resource cleanup - LLMProvider protocol."""
         self.unload()

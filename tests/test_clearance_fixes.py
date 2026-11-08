@@ -1,5 +1,5 @@
 """
-VoxDesk — Clearance Stage Blocker Fix Tests
+VoxDesk - Clearance Stage Blocker Fix Tests
 Tests for F-01, F-07, F-03, F-11 from the verified clearance audit.
 """
 
@@ -30,7 +30,7 @@ class TestF01ScreenContextGuard:
         else:
             chat_section = rest
         assert "screen_context_enabled" in chat_section, (
-            "POST /api/chat does NOT check screen_context_enabled — PRIVACY GAP"
+            "POST /api/chat does NOT check screen_context_enabled - PRIVACY GAP"
         )
 
     @pytest.mark.unit
@@ -159,10 +159,10 @@ class TestF03ModelSelectFeedback:
         # Find the updateModel function
         fn_start = content.index("async updateModel()")
         fn_section = content[fn_start:fn_start + 800]
-        # Must check response status — not just silently catch
+        # Must check response status - not just silently catch
         assert ("res.ok" in fn_section or "res.status" in fn_section or
                 "response.ok" in fn_section or "response.status" in fn_section), (
-            "updateModel() does not check response status — silently swallows 501"
+            "updateModel() does not check response status - silently swallows 501"
         )
 
     @pytest.mark.unit
@@ -217,7 +217,7 @@ class TestF11SidecarStaleHealth:
         mgr._process.poll.return_value = 1  # process exited with code 1
 
         assert mgr.is_healthy is False, (
-            "is_healthy is True despite process being dead — stale health"
+            "is_healthy is True despite process being dead - stale health"
         )
 
     @pytest.mark.unit

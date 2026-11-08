@@ -1,5 +1,5 @@
 """
-VoxDesk — Çalışma Zamanı İzolasyonu
+VoxDesk - Çalışma Zamanı İzolasyonu
 İndirme bittikten sonra tüm dış bağlantıları kapatır.
 Kullanım sırasında hiçbir veri bilgisayar dışına çıkmaz.
 """
@@ -16,9 +16,9 @@ logger = logging.getLogger("voxdesk.isolation")
 def _set_env_guards() -> None:
     """Tüm bileşenlerin dış bağlantı yapmasını engelleyen env variable'ları set et."""
     guards = {
-        # HuggingFace Hub — model indirme/kontrol tamamen kapalı
+        # HuggingFace Hub - model indirme/kontrol tamamen kapalı
         "HF_HUB_OFFLINE": "1",
-        # Transformers — offline mode
+        # Transformers - offline mode
         "TRANSFORMERS_OFFLINE": "1",
     }
 
@@ -32,7 +32,7 @@ def verify_isolation() -> dict:
     Tam izolasyon doğrulaması yap.
     İndirme sonrası çalışma zamanında çağrılır.
 
-    NOT: Outbound bağlantı testi yapılmaz — privacy-first politika gereği
+    NOT: Outbound bağlantı testi yapılmaz - privacy-first politika gereği
     startup'ta hiçbir dış bağlantı açılmaz. Env guard'lar asıl enforcement
     mekanizmasıdır.
 
@@ -55,11 +55,11 @@ def verify_isolation() -> dict:
 
     if hf_offline and tf_offline:
         report["status"] = "OK"
-        logger.info("🔒 İzolasyon aktif — tüm env guard'lar set edildi")
+        logger.info("🔒 İzolasyon aktif - tüm env guard'lar set edildi")
     else:
         report["status"] = "WARNING"
         logger.warning(
-            "⚠️  Bazı env guard'lar eksik — izolasyon tam değil. "
+            "⚠️  Bazı env guard'lar eksik - izolasyon tam değil. "
             f"HF_HUB_OFFLINE={os.environ.get('HF_HUB_OFFLINE')}, "
             f"TRANSFORMERS_OFFLINE={os.environ.get('TRANSFORMERS_OFFLINE')}"
         )

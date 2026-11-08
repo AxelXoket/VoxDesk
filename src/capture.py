@@ -1,5 +1,5 @@
 """
-VoxDesk — Screen Capture Module
+VoxDesk - Screen Capture Module
 dxcam ile yüksek performanslı ekran yakalama.
 Ring buffer ile son N frame bellekte tutulur.
 """
@@ -69,7 +69,7 @@ class ScreenCapture:
         self._thread: threading.Thread | None = None
         self._lock = threading.Lock()
         self._frame_counter: int = 0  # Part 1.5: monotonic frame ID
-        # Pin mechanism — hotkey ile yakalanan frame
+        # Pin mechanism - hotkey ile yakalanan frame
         self._pinned_frame: CapturedFrame | None = None
         self._pin_lock = threading.Lock()
 
@@ -78,7 +78,7 @@ class ScreenCapture:
         try:
             import dxcam
             self._camera = dxcam.create()
-            logger.info(f"✅ dxcam başlatıldı — ekran yakalama hazır")
+            logger.info(f"✅ dxcam başlatıldı - ekran yakalama hazır")
         except Exception as e:
             logger.error(f"❌ dxcam başlatılamadı: {e}")
             raise
@@ -102,7 +102,7 @@ class ScreenCapture:
             rw = self.preview_resize_width
             jq = self.preview_jpeg_quality
 
-        # Resize — 0 = no resize
+        # Resize - 0 = no resize
         if rw > 0 and img.width > rw:
             ratio = rw / img.width
             new_height = int(img.height * ratio)
@@ -127,7 +127,7 @@ class ScreenCapture:
         )
 
     def _capture_frame(self) -> CapturedFrame | None:
-        """Tek bir frame yakala — PREVIEW profili (ring buffer için)."""
+        """Tek bir frame yakala - PREVIEW profili (ring buffer için)."""
         try:
             frame = self._camera.grab()
             if frame is None:
@@ -139,8 +139,8 @@ class ScreenCapture:
             return None
 
     def _capture_loop(self):
-        """Arka planda sürekli frame yakalama döngüsü — drift-free."""
-        logger.info(f"🖥️ Capture döngüsü başladı — interval: {self.interval}s")
+        """Arka planda sürekli frame yakalama döngüsü - drift-free."""
+        logger.info(f"🖥️ Capture döngüsü başladı - interval: {self.interval}s")
         while self._running:
             t0 = time.monotonic()
             frame = self._capture_frame()
@@ -191,16 +191,16 @@ class ScreenCapture:
 
     def grab_now(self, profile: str = "inference") -> CapturedFrame | None:
         """
-        Anlık frame yakala — dxcam-first, PIL fallback.
-        Default: inference profili (1920/Q92) — LLM inference için.
+        Anlık frame yakala - dxcam-first, PIL fallback.
+        Default: inference profili (1920/Q92) - LLM inference için.
         profile="preview" ile düşük kalite de alınabilir.
 
         Priority:
-          1. dxcam camera (if available & running) — GPU capture
-          2. PIL ImageGrab — CPU fallback
-          3. Ring buffer latest — stale fallback (logged)
+          1. dxcam camera (if available & running) - GPU capture
+          2. PIL ImageGrab - CPU fallback
+          3. Ring buffer latest - stale fallback (logged)
         """
-        # 1. dxcam — preferred path
+        # 1. dxcam - preferred path
         if self._camera is not None and self._running:
             try:
                 frame = self._camera.grab()
@@ -210,7 +210,7 @@ class ScreenCapture:
             except Exception as e:
                 logger.warning(f"dxcam grab failed, trying PIL fallback: {e}")
 
-        # 2. PIL ImageGrab — CPU fallback
+        # 2. PIL ImageGrab - CPU fallback
         try:
             from PIL import ImageGrab
             img = ImageGrab.grab()
@@ -218,7 +218,7 @@ class ScreenCapture:
         except Exception as e:
             logger.error(f"CPU grab also failed: {e}")
 
-        # 3. Stale ring buffer fallback — clearly marked
+        # 3. Stale ring buffer fallback - clearly marked
         latest = self.get_latest_frame()
         if latest:
             logger.warning(
@@ -228,11 +228,11 @@ class ScreenCapture:
         return latest
 
     # ── Pin Mechanism ─────────────────────────────────────────
-    # Hotkey ile mevcut frame'i "pinle" — sekme değişince kaybolmasın
+    # Hotkey ile mevcut frame'i "pinle" - sekme değişince kaybolmasın
 
     def pin_current_frame(self) -> CapturedFrame | None:
         """
-        Mevcut ekranı anlık yakala ve pinle — INFERENCE profili.
+        Mevcut ekranı anlık yakala ve pinle - INFERENCE profili.
         Hotkey callback'inden çağrılır.
         Returns: Pinlenen frame, veya None (capture başarısızsa)
         """
@@ -240,7 +240,7 @@ class ScreenCapture:
         if frame:
             with self._pin_lock:
                 self._pinned_frame = frame
-            logger.info(f"📌 Ekran pinlendi — inference ({frame.width}x{frame.height}, Q{frame.jpeg_quality})")
+            logger.info(f"📌 Ekran pinlendi - inference ({frame.width}x{frame.height}, Q{frame.jpeg_quality})")
         return frame
 
     def get_pinned_frame(self) -> CapturedFrame | None:
@@ -297,7 +297,7 @@ class ScreenCapture:
 
     def close(self) -> None:
         """
-        Full cleanup — stop capture, release camera, clear buffers.
+        Full cleanup - stop capture, release camera, clear buffers.
         Safe to call multiple times.
         """
         self.stop()

@@ -1,7 +1,7 @@
 ﻿"""
-VoxDesk — STT & TTS Module Tests
+VoxDesk - STT & TTS Module Tests
 Ses işleme mantığı, threshold, voice profil yönetimi.
-Gerçek model yüklenmez — sadece logic test edilir.
+Gerçek model yüklenmez - sadece logic test edilir.
 """
 
 import pytest
@@ -44,7 +44,7 @@ class TestSpeechRecognizerInit:
         assert stt.activation_threshold_db == -25.0
 
     def test_model_not_loaded_on_init(self):
-        """Model init'te yüklenmemeli — lazy loading."""
+        """Model init'te yüklenmemeli - lazy loading."""
         stt = SpeechRecognizer()
         assert stt._model is None
 
@@ -62,7 +62,7 @@ class TestSpeechRecognizerInit:
 
 
 class TestVoiceActivation:
-    """Ses seviyesi eşik kontrolü — dB hesaplama doğruluğu."""
+    """Ses seviyesi eşik kontrolü - dB hesaplama doğruluğu."""
 
     def test_silence_below_threshold(self):
         stt = SpeechRecognizer(activation_threshold_db=-30.0)
@@ -82,7 +82,7 @@ class TestVoiceActivation:
         assert stt.check_voice_activation(empty) is False
 
     def test_threshold_edge_case(self):
-        """Tam eşikte — crash olmamalı."""
+        """Tam eşikte - crash olmamalı."""
         stt = SpeechRecognizer(activation_threshold_db=-20.0)
         # 0.1 RMS → 20*log10(0.1) = -20dB
         edge_audio = np.ones(1600, dtype=np.float32) * 0.1
@@ -152,7 +152,7 @@ class TestVoiceSynthInit:
         assert tts.enabled is False
 
     def test_pipeline_not_loaded_on_init(self):
-        """Pipeline init'te yüklenmemeli — lazy loading."""
+        """Pipeline init'te yüklenmemeli - lazy loading."""
         tts = VoiceSynth()
         assert tts._pipeline is None
 

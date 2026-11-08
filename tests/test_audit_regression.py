@@ -1,7 +1,7 @@
 """
-VoxDesk — Sprint 5.0 Audit Regression Tests
+VoxDesk - Sprint 5.0 Audit Regression Tests
 Audit bulgularının düzeltildiğini doğrulayan testler.
-Her bulgu için en az bir test — regression guard.
+Her bulgu için en az bir test - regression guard.
 """
 
 import inspect
@@ -13,7 +13,7 @@ from src.protocols import LLMProvider, TranslatorEngine
 
 
 # ══════════════════════════════════════════════════════════════
-#  Audit #1 — LLMProvider Protocol response_mode
+#  Audit #1 - LLMProvider Protocol response_mode
 # ══════════════════════════════════════════════════════════════
 
 class TestAuditProtocolDrift:
@@ -52,7 +52,7 @@ class TestAuditProtocolDrift:
 
 
 # ══════════════════════════════════════════════════════════════
-#  Audit #2 — Debug Metrics Translator
+#  Audit #2 - Debug Metrics Translator
 # ══════════════════════════════════════════════════════════════
 
 class TestAuditDebugMetrics:
@@ -71,7 +71,7 @@ class TestAuditDebugMetrics:
 
 
 # ══════════════════════════════════════════════════════════════
-#  Audit #3 — pyproject.toml Translator Deps
+#  Audit #3 - pyproject.toml Translator Deps
 # ══════════════════════════════════════════════════════════════
 
 class TestAuditDependencies:
@@ -115,7 +115,7 @@ class TestAuditDependencies:
 
 
 # ══════════════════════════════════════════════════════════════
-#  Audit #4 — STT local_files_only
+#  Audit #4 - STT local_files_only
 # ══════════════════════════════════════════════════════════════
 
 class TestAuditSTTIsolation:
@@ -160,7 +160,7 @@ class TestAuditSTTIsolation:
 
 
 # ══════════════════════════════════════════════════════════════
-#  Audit #7 — VISUAL_MEMO_PROMPT English
+#  Audit #7 - VISUAL_MEMO_PROMPT English
 # ══════════════════════════════════════════════════════════════
 
 class TestAuditVisualMemo:
@@ -180,7 +180,7 @@ class TestAuditVisualMemo:
 
 
 # ══════════════════════════════════════════════════════════════
-#  Audit #9 — Gereksiz Bağımlılık Temizliği
+#  Audit #9 - Gereksiz Bağımlılık Temizliği
 # ══════════════════════════════════════════════════════════════
 
 class TestAuditUnusedDeps:
@@ -196,7 +196,7 @@ class TestAuditUnusedDeps:
 
 
 # ══════════════════════════════════════════════════════════════
-#  Audit #10 — Version Check
+#  Audit #10 - Version Check
 # ══════════════════════════════════════════════════════════════
 
 class TestAuditVersion:
@@ -214,7 +214,7 @@ class TestAuditVersion:
 
 
 # ══════════════════════════════════════════════════════════════
-#  Audit #11 — Model Path Config Alignment
+#  Audit #11 - Model Path Config Alignment
 # ══════════════════════════════════════════════════════════════
 
 class TestAuditModelPaths:
@@ -258,7 +258,7 @@ class TestAuditModelPaths:
 
 
 # ══════════════════════════════════════════════════════════════
-#  Cross-Cutting — Isolation Integrity
+#  Cross-Cutting - Isolation Integrity
 # ══════════════════════════════════════════════════════════════
 
 class TestAuditIsolation:

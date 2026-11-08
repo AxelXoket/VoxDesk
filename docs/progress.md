@@ -1,11 +1,11 @@
-# VoxDesk — Development Progress
+# VoxDesk - Development Progress
 
 > Tracks completed work across all development phases.
 > Last updated : 2026-05-26
 
 ---
 
-## 2026-05-26 (Monday) — Clearance Stage Blocker Fixes
+## 2026-05-26 (Monday) - Clearance Stage Blocker Fixes
 
 ### Clearance Stage Fixes : F-01, F-07, F-03, F-11 ✅
 
@@ -15,34 +15,34 @@
 
 **What was done :**
 
-**F-01 — POST /api/chat must respect screen_context_enabled :**
-- `src/routes/chat.py` — Added `state.screen_context_enabled` to the image artifact guard in the HTTP `/api/chat` handler.
+**F-01 - POST /api/chat must respect screen_context_enabled :**
+- `src/routes/chat.py` - Added `state.screen_context_enabled` to the image artifact guard in the HTTP `/api/chat` handler.
 - Previously: `if request.include_screen and state.capture:` allowed screen artifacts to bypass the privacy toggle.
-- After: `if request.include_screen and state.screen_context_enabled and state.capture:` — now matches the WS chat guard exactly.
+- After: `if request.include_screen and state.screen_context_enabled and state.capture:` - now matches the WS chat guard exactly.
 - No change to WS chat, voice routes, or any other path.
 
-**F-07 — POST /api/history/export must not leak absolute filesystem path :**
-- `src/routes/history.py` — Changed `str(filename)` → `filename.name` in the export response.
+**F-07 - POST /api/history/export must not leak absolute filesystem path :**
+- `src/routes/history.py` - Changed `str(filename)` → `filename.name` in the export response.
 - The file is still saved to the full path on disk; only the returned `"file"` field in the JSON response changed.
-- Frontend alert still works — displays just the filename (e.g. `voxdesk_history_20260526_210000.json`).
+- Frontend alert still works - displays just the filename (e.g. `voxdesk_history_20260526_210000.json`).
 - Server log (`logger.info`) still records the full path internally.
 
-**F-03 — Model select must not silently fail on PUT /api/model 501 :**
-- `frontend/js/settings.js` — `updateModel()` now checks `res.ok`, shows `alert()` with the backend's message on failure, and reverts the selector to the previously active model.
+**F-03 - Model select must not silently fail on PUT /api/model 501 :**
+- `frontend/js/settings.js` - `updateModel()` now checks `res.ok`, shows `alert()` with the backend's message on failure, and reverts the selector to the previously active model.
 - `_currentModel` tracking added: seeded from `loadSettings()`, updated only on successful response.
 - Backend `PUT /api/model` still correctly returns HTTP 501 (unchanged).
 - No fake success path exists anymore.
 
-**F-11 — Sidecar is_healthy must not stay stale after process crash :**
-- `src/llm/sidecar.py` — `is_healthy` property updated to check `_process.poll()` when a process was spawned by VoxDesk.
-- Previously: `return self._healthy` — remained True even if the llama-server process exited.
+**F-11 - Sidecar is_healthy must not stay stale after process crash :**
+- `src/llm/sidecar.py` - `is_healthy` property updated to check `_process.poll()` when a process was spawned by VoxDesk.
+- Previously: `return self._healthy` - remained True even if the llama-server process exited.
 - After: returns False if `_process is not None and _process.poll() is not None` (process exited).
 - Port-reuse mode (`_process=None`) preserves previous behavior: `is_healthy` driven by `_healthy` flag alone.
 - `/api/status` `"sidecar": { "healthy": ... }` now reflects truthful process state.
 
 **Tests Added :**
-- `tests/test_clearance_fixes.py` — 11 new tests: static source guards + runtime async tests for F-01/F-07, static JS source checks for F-03, unit tests for all 4 F-11 cases.
-- `tests/test_sprint6_context.py` — 1 assertion updated: `test_screen_context_off_means_no_artifact` now checks the corrected guard string.
+- `tests/test_clearance_fixes.py` - 11 new tests: static source guards + runtime async tests for F-01/F-07, static JS source checks for F-03, unit tests for all 4 F-11 cases.
+- `tests/test_sprint6_context.py` - 1 assertion updated: `test_screen_context_off_means_no_artifact` now checks the corrected guard string.
 
 **Post-implementation review verdict :** SAFE_AFTER_DOCS
 
@@ -54,7 +54,7 @@
 
 ---
 
-## 2026-05-05 (Monday) — Sprint 8.1 : Integrity and Privacy Fixes
+## 2026-05-05 (Monday) - Sprint 8.1 : Integrity and Privacy Fixes
 
 ### Sprint 7 : Voice UX ✅
 
@@ -67,18 +67,18 @@ preserved without changes.
 
 **What was done :**
 
-**Faz 1 — Backend :**
-- `POST /api/tts/read` endpoint in `src/routes/chat.py` — WAV bytes response
+**Faz 1 - Backend :**
+- `POST /api/tts/read` endpoint in `src/routes/chat.py` - WAV bytes response
 - Validation : empty text → 400, oversized (>2000 chars) → 400, TTS unavailable → 503
-- No global TTS config mutation — local request processing only
+- No global TTS config mutation - local request processing only
 - `enable_full_voice_mode: true` feature flag in `FeaturesConfig` + `default.yaml`
 
-**Faz 2 — AudioWorklet RMS :**
+**Faz 2 - AudioWorklet RMS :**
 - `audio-processor.js` : RMS level computation per frame, reported every 8 frames (~21ms)
 - `audio-capture.js` : `onLevelUpdate` callback for silence detection / waveform
 
-**Faz 3 — Full Voice Mode State Machine :**
-- **New file** `frontend/js/full-voice-mode.js` — `FullVoiceMode` class
+**Faz 3 - Full Voice Mode State Machine :**
+- **New file** `frontend/js/full-voice-mode.js` - `FullVoiceMode` class
 - 7-state machine : idle → listening → user_speaking → silence_countdown → processing → ai_speaking → error
 - 3-second silence detection with `hasSpokeYet` guard (no false turn closes)
 - Turn-end beep via Web Audio API oscillator (880Hz, 80ms, vol 0.15)
@@ -86,21 +86,21 @@ preserved without changes.
 - AI speaking state → RMS ignored (echo prevention), no barge-in
 - WebSocket session stays open between turns (no reconnect per turn)
 
-**Faz 4 — HTML + CSS :**
+**Faz 4 - HTML + CSS :**
 - FVM overlay (`#fvmOverlay`) in chat area with close button
 - FVM sidebar toggle (`#fullVoiceToggle`) in settings panel
 - State-aware CSS : listening (cyan), speaking (green), silence (yellow), processing/AI (magenta), error (red)
 - Read-aloud button styles (`.read-aloud-btn`)
 
-**Faz 5 — Chat + App Integration :**
+**Faz 5 - Chat + App Integration :**
 - `chat.js` : Read-aloud button (🔊) on all assistant messages + after stream end
 - `app.js` : FVM init, `voice:message` guard (FVM active → dictation handler skipped)
-- `app.js` : `activeAudio` global reference — prevents TTS/read-aloud playback conflicts
+- `app.js` : `activeAudio` global reference - prevents TTS/read-aloud playback conflicts
 - `app.js` : `readAloud` event handler → `fetch('/api/tts/read')` → blob URL → `Audio()`
 - `app.js` : Header `#btnVoiceMode` button → FVM toggle (legacy fallback preserved)
 - `playAudioFromBase64()` global alias exposed for FVM TTS queue
 
-**Faz 6 — Tests :**
+**Faz 6 - Tests :**
 - 35 new tests in `test_sprint7_voice_ux.py`
 - Backend : endpoint existence, validation, 503, no mutation, WAV content type
 - Frontend : RMS, FVM states, silence constants, hasSpokeYet, beep, external URL check
@@ -115,7 +115,7 @@ preserved without changes.
 
 ---
 
-## 2026-05-04 (Sunday) — Sprint 6.1 : Screen Context Policy Unification
+## 2026-05-04 (Sunday) - Sprint 6.1 : Screen Context Policy Unification
 
 ### Sprint 6.1 : Unified Screen Context ✅
 
@@ -128,13 +128,13 @@ When OFF, no image artifact is created or sent to LLM.
 
 **What was done :**
 
-**Task 1 — voice_v2 Screen Artifact (C-1 CRITICAL fix) :**
+**Task 1 - voice_v2 Screen Artifact (C-1 CRITICAL fix) :**
 - `_process_audio_buffer` : replaced `image_bytes=None` with `get_best_frame()` → `build_artifact_from_frame()` → `image_artifact=voice_artifact`
 - `_handle_legacy_audio` : same fix applied
 - Module docstring updated to reflect unified screen context policy
 - 6 new regression tests in `test_sprint6_context.py`
 
-**Task 2 — Frame Selection Normalization :**
+**Task 2 - Frame Selection Normalization :**
 - `chat.py` HTTP `/chat` : `get_latest_frame()` → `get_best_frame()`
 - `chat.py` WS `/ws/chat` : `grab_now()` → `get_best_frame()`
 - `chat.py` WS `/ws/voice` : `grab_now()` → `get_best_frame()`
@@ -142,7 +142,7 @@ When OFF, no image artifact is created or sent to LLM.
 - Stale ring buffer fallback now logged as warning with age info
 - 5 new regression tests
 
-**Task 3 — Frontend Alignment :**
+**Task 3 - Frontend Alignment :**
 - Removed `handleFiles()`, `processImage()`, `renderAttachments()` from `chat.js`
 - Removed `this.attachments`, `this.MAX_ATTACHMENTS`, `this.MAX_IMAGE_WIDTH` state
 - Removed drag-drop, paste-image, upload button event listeners
@@ -151,12 +151,12 @@ When OFF, no image artifact is created or sent to LLM.
 - `addMessage()` no longer accepts `imagePreviews` parameter
 - 8 new regression tests
 
-**Task 4 — API Honesty :**
+**Task 4 - API Honesty :**
 - `PUT /model` : returns HTTP 501 Not Implemented (was fake 200 OK)
 - `PUT /voice-activation/toggle` : uses `AppState._voice_activation_enabled` runtime flag (was `object.__setattr__` Pydantic bypass)
 - 3 new regression tests
 
-**Task 5 — Dead Code Cleanup :**
+**Task 5 - Dead Code Cleanup :**
 - Removed `_bg_visual_memo()` method from `provider.py` (never called)
 - Removed `_last_visual_memo` field from `LlamaCppProvider.__init__`
 - Removed `VISUAL_MEMO_PROMPT` import from `provider.py`
@@ -164,11 +164,11 @@ When OFF, no image artifact is created or sent to LLM.
 - Preserved `ChatMessage.visual_memo` and `VISUAL_MEMO_PROMPT` in `types.py` (used by history/export/tests)
 - 4 new regression tests
 
-**Task 6 — SecurityConfig :**
-- `audio_protocol.py` already reads `max_ws_frame_bytes` from `SecurityConfig` via `get_max_frame_bytes()` — verified and tested
+**Task 6 - SecurityConfig :**
+- `audio_protocol.py` already reads `max_ws_frame_bytes` from `SecurityConfig` via `get_max_frame_bytes()` - verified and tested
 - Remaining SecurityConfig fields documented as backlog
 
-**Task 7 — Tests :**
+**Task 7 - Tests :**
 - 29 new tests in `test_sprint6_context.py`
 - 2 existing tests updated in `test_sprint52_fixes.py` (lightbox, model stub)
 - Final : 623 passed, 3 xfailed, 0 failed
@@ -176,9 +176,9 @@ When OFF, no image artifact is created or sent to LLM.
 ---
 
 
-## 2026-04-25 (Friday) — Pre-Sprint Foundation
+## 2026-04-25 (Friday) - Pre-Sprint Foundation
 
-### Phase 1–6: Foundation → Polish ✅
+### Phase 1-6: Foundation → Polish ✅
 
 Built from scratch as a privacy-first, offline desktop AI assistant with voice + screen capture.
 
@@ -187,19 +187,19 @@ Built from scratch as a privacy-first, offline desktop AI assistant with voice +
 - Registered custom markers: `unit`, `regression`, `benchmark`, `gpu`
 - Set up `pytest-asyncio` with `auto` mode, coverage threshold at 55%
 - Implemented `src/metrics.py` with sliding-window percentile tracking (process-local, never external)
-- Implemented `src/registry.py` — factory catalog with immutable registrations
-- Created `src/protocols.py` — abstract interfaces for STT, TTS, LLM, Capture
+- Implemented `src/registry.py` - factory catalog with immutable registrations
+- Created `src/protocols.py` - abstract interfaces for STT, TTS, LLM, Capture
 - Hardened all Pydantic config models with `extra='forbid'`
 - Added privacy/network/model_loading config sections
-- Implemented `src/model_state.py` — `ManagedModel` with 6-state machine (UNLOADED → LOADING → LOADED → IN_USE → UNLOADING → UNLOADED)
-- Implemented `src/vram_manager.py` — background monitor with idle unload policy
+- Implemented `src/model_state.py` - `ManagedModel` with 6-state machine (UNLOADED → LOADING → LOADED → IN_USE → UNLOADING → UNLOADED)
+- Implemented `src/vram_manager.py` - background monitor with idle unload policy
 - Integrated STT (`src/stt.py`) and TTS (`src/tts.py`) with ManagedModel lifecycle
 - Defined audio protocol in `src/audio_protocol.py` (PCM S16LE, 16kHz, mono, 20ms chunks)
 - Implemented `/ws/voice/v2` binary audio WebSocket endpoint
 - Created `frontend/js/audio-processor.js` (AudioWorklet) + `frontend/js/audio-capture.js`
 - MediaRecorder fallback for browsers without AudioWorklet
 - Created `ARCHITECTURE.md`, `SMOKE_TEST.md`
-- Hardened `/api/health` — no secrets exposed
+- Hardened `/api/health` - no secrets exposed
 - Feature flags: `enable_binary_audio`, `enable_audioworklet`, `enable_vram_unload`
 - Safe shutdown sequence with isolated try/except per component
 
@@ -218,7 +218,7 @@ Built from scratch as a privacy-first, offline desktop AI assistant with voice +
 
 ---
 
-## 2026-04-26 (Saturday) — 03:00 — Sprint 1: Foundation Hardening
+## 2026-04-26 (Saturday) - 03:00 - Sprint 1: Foundation Hardening
 
 ### Sprint 1: Config Mapping + API + Security ✅
 
@@ -226,45 +226,45 @@ Built from scratch as a privacy-first, offline desktop AI assistant with voice +
 
 **What was done:**
 
-**Task 1 — Config Mapping:**
+**Task 1 - Config Mapping:**
 - Added 6 missing YAML→Pydantic section mappings to `load_config()`: `features`, `network`, `privacy`, `model_loading`, `security`, `vram`
 - Added corresponding sections to `config/default.yaml` with Pydantic-matching defaults
 - 8 new regression tests in `test_config.py`
 
-**Task 2 — /api/status Endpoint:**
+**Task 2 - /api/status Endpoint:**
 - Created `GET /api/status` returning safe runtime state: `api`, `capture`, `connections`, `models`, `features`, `last_error`
 - Models expose `name` + `state` only (no filesystem paths)
 - 6 new regression tests in `test_routes.py`
 
-**Task 3 — app.js Health/Status Migration:**
+**Task 3 - app.js Health/Status Migration:**
 - Rewrote `checkHealth()` to use `/api/health` for availability + `/api/status` for runtime state
 - Eliminated `data.model.split('/')` crash
 - Added graceful degradation when `/api/status` unavailable
 - 3 new regression tests in `test_regression.py`
 
-**Task 4 — Debug Metrics Feature Flag:**
+**Task 4 - Debug Metrics Feature Flag:**
 - Guarded `/api/debug/metrics` with `config.features.enable_debug_metrics`
 - Returns HTTP 403 when disabled (default: disabled)
 - 2 new regression tests in `test_routes.py`
 
-**Task 5 — WebSocket Origin Validation:**
+**Task 5 - WebSocket Origin Validation:**
 - Added `check_origin()` helper supporting exact + wildcard port patterns
 - Modified `ConnectionManager.connect()` to accept `allowed_origins` parameter
 - Uses accept-then-close pattern (Starlette requires accept before close)
 - Missing Origin → allowed (non-browser/test client compatibility)
 - 5 new regression tests in `test_routes.py`
 
-**Task 6 — audio-capture.js Loading:**
+**Task 6 - audio-capture.js Loading:**
 - Added `<script src="/static/js/audio-capture.js">` in correct order in `index.html`
 - `audio-processor.js` correctly NOT loaded as script tag (AudioWorklet only)
 - 3 new regression tests in `test_regression.py`
 
-**Task 7 — Voxly Prompt Hardening:**
+**Task 7 - Voxly Prompt Hardening:**
 - Replaced `"Never refuse to help"` → refusal of unsafe/illegal/harmful requests
 - Replaced `"Respond in the same language"` → English default + Turkish understanding
 - 4 new regression tests in `test_regression.py`
 
-**Task 8 — VRAM Monitor Feature Flag:**
+**Task 8 - VRAM Monitor Feature Flag:**
 - Guarded `vram_manager.start_monitor()` with `config.features.enable_vram_unload`
 - VRAMManager still created for reporting; monitor only runs when flag is `true`
 - 2 new regression tests in `test_routes.py`
@@ -275,7 +275,7 @@ Built from scratch as a privacy-first, offline desktop AI assistant with voice +
 
 ---
 
-## 2026-04-26 (Saturday) — 08:00 — Sprint 2: Voice Wiring
+## 2026-04-26 (Saturday) - 08:00 - Sprint 2: Voice Wiring
 
 ### Sprint 2: Binary Audio Protocol + Voice Pipeline ✅
 
@@ -288,20 +288,20 @@ Built from scratch as a privacy-first, offline desktop AI assistant with voice +
 - Structured error responses: `LLM_FAILED`, `TTS_FAILED`, `voice_error`
 - LLM/TTS metrics: `llm_errors_total`, `tts_latency_ms`
 - Legacy base64 audio path preserved for backward compatibility
-- No voice auto-reconnect — user manual retry (design decision)
+- No voice auto-reconnect - user manual retry (design decision)
 
 **Verification:**
 - 382 tests passing, 59 regression tests
 
 ---
 
-## 2026-04-26 (Saturday) — 16:00 — Sprint 3: Observability
+## 2026-04-26 (Saturday) - 16:00 - Sprint 3: Observability
 
 ### Sprint 3: DEV HUD + Metrics + Multi-Frame Vision ✅
 
 **What was done:**
 - Added DEV HUD glassmorphism overlay to frontend
-- Created `src/audio_utils.py` — extracted shared audio decoding logic
+- Created `src/audio_utils.py` - extracted shared audio decoding logic
 - Upgraded `_build_messages` for multi-frame image input
 - Added `llm_frame_count` configuration field
 - Refactored chat/voice routes to use `audio_utils`
@@ -312,7 +312,7 @@ Built from scratch as a privacy-first, offline desktop AI assistant with voice +
 
 ---
 
-## 2026-04-26 (Saturday) — 22:00 — Sprint 3 Post-Audit
+## 2026-04-26 (Saturday) - 22:00 - Sprint 3 Post-Audit
 
 ### Sprint 3 Post-Audit: Cross-Reference Review ✅
 
@@ -323,7 +323,7 @@ Completed dual-AI cross-reference audit against Sprint 3 Post-Audit Report (15 f
 - Confirmed `local_files_only: true` and `allow_runtime_model_downloads: false` enforcement
 - Verified `/api/status` and `/api/settings` do not expose secrets/paths/credentials
 - Identified 5 critical blockers and 4 hardening items for Sprint 3.5
-- Created `docs/security_privacy_policy.md` — formal privacy contract
+- Created `docs/security_privacy_policy.md` - formal privacy contract
 
 **Critical blockers identified:**
 1. WS Origin validation helper exists but routes don't pass `allowed_origins`
@@ -334,63 +334,63 @@ Completed dual-AI cross-reference audit against Sprint 3 Post-Audit Report (15 f
 
 ---
 
-## 2026-04-27 (Sunday) — 02:15 — Sprint 3.5: Runtime Hardening
+## 2026-04-27 (Sunday) - 02:15 - Sprint 3.5: Runtime Hardening
 
 ### Sprint 3.5: 9-Task Hardening Patch ✅
 
 **Baseline:** 382 tests → 382 tests (zero regression) · Regression: 59 (preserved)
 
-Addressed all 9 issues from the Master Risk & Hardening Report. No new features — only existing claims made real.
+Addressed all 9 issues from the Master Risk & Hardening Report. No new features - only existing claims made real.
 
 **What was done:**
 
-**Task 1 — WS Origin Enforcement:**
+**Task 1 - WS Origin Enforcement:**
 - Made `ConnectionManager` config-aware via `set_allowed_origins()` injection
 - All WS routes now enforce Origin validation automatically (no route code changes)
 - Wired in `main.py` startup alongside existing `set_metrics()` pattern
 
-**Task 2 — record_error() Wiring:**
+**Task 2 - record_error() Wiring:**
 - Connected `AppState.record_error()` to 5 exception paths:
   - Chat LLM stream error, Chat WS generic error
   - Voice WS generic error, STT error, Voice LLM error
 - DEV HUD `last_error` now populated with real error messages
 
-**Task 3 — Voice CONNECTING Guard + Close/Error Cleanup:**
+**Task 3 - Voice CONNECTING Guard + Close/Error Cleanup:**
 - Added `WebSocket.CONNECTING` guard to `connectVoice()` preventing duplicate sockets
 - Added `voice:disconnected` and `voice:error` cleanup handlers in `app.js`
 - Cleanup stops AudioCapture, clears mic/TTS queue, resets UI state
 - No auto-reconnect (Sprint 2 design decision preserved)
 
-**Task 4 — Frontend Voice Feature Flags:**
+**Task 4 - Frontend Voice Feature Flags:**
 - Cached `features` from `/api/status` in `_cachedFeatures` global
 - Voice mode activation checks `enable_binary_audio` and `enable_mediarecorder_fallback`
 - Disabled voice shows user warning, does not connect WS
 - `AudioCapture` receives `useBinary` option from feature flags
 
-**Task 5 — AudioCapture Transport Adapter:**
+**Task 5 - AudioCapture Transport Adapter:**
 - Replaced raw `WebSocket` parameter with `{sendControl, sendBinary, isOpen}` transport adapter
 - `app.js` creates transport from `VoxWebSocket` methods (centralized send/receive)
 - Backwards compat: raw WS auto-wrapped with deprecation warning (safety net only)
 - Zero `this.ws.send` calls remain in `audio-capture.js`
 
-**Task 6 — MediaRecorder Fallback Stop Ordering:**
+**Task 6 - MediaRecorder Fallback Stop Ordering:**
 - Mode-aware `stop()`: worklet sends `audio_end`, MediaRecorder does not
 - Prevents `audio_end` arriving before legacy audio payload
 
-**Task 7 — ACK Pending Buffer Bound/Timeout:**
-- `_maxPendingChunks = 10` — excess drops oldest chunk
-- `_ackTimeoutMs = 3000` — no ACK → auto-stop capture
+**Task 7 - ACK Pending Buffer Bound/Timeout:**
+- `_maxPendingChunks = 10` - excess drops oldest chunk
+- `_ackTimeoutMs = 3000` - no ACK → auto-stop capture
 - ACK received → timer cleared immediately
 
-**Task 8 — STT_FAILED Structured Error:**
+**Task 8 - STT_FAILED Structured Error:**
 - Wrapped STT `run_in_executor()` call with `try/except`
 - On failure: `stt_errors_total` metric incremented, `record_error()` called
 - Frontend receives structured `{"type":"voice_error","code":"STT_FAILED","message":"...","recoverable":true}`
 
-**Task 9 — Docs Sync:**
+**Task 9 - Docs Sync:**
 - Updated `docs/PROGRESS.md` with Sprint 3.5 section (this file)
-- Created `docs/dependency_matrix.md` — CUDA/package compatibility for RTX 5080 Blackwell
-- Created `docs/local_smoke_checklist.md` — manual verification gate for Sprint 4
+- Created `docs/dependency_matrix.md` - CUDA/package compatibility for RTX 5080 Blackwell
+- Created `docs/local_smoke_checklist.md` - manual verification gate for Sprint 4
 
 **Key security decisions:**
 - `security_privacy_policy.md` now formal project policy
@@ -410,7 +410,7 @@ Addressed all 9 issues from the Master Risk & Hardening Report. No new features 
 
 ---
 
-## 2026-04-27 (Sunday) — 03:00 — Local Smoke Execution
+## 2026-04-27 (Sunday) - 03:00 - Local Smoke Execution
 
 ### Real Hardware Smoke: RTX 5080 + Windows ✅
 
@@ -438,7 +438,7 @@ First-ever real hardware deployment of VoxDesk.
 
 ---
 
-## 2026-04-27 (Sunday) — 03:10 — Sprint 3.6: Micro Patch
+## 2026-04-27 (Sunday) - 03:10 - Sprint 3.6: Micro Patch
 
 ### Screen WS Broadcast Cleanup ✅
 
@@ -455,13 +455,13 @@ First-ever real hardware deployment of VoxDesk.
 
 ---
 
-## 2026-04-27 (Sunday) — 07:00 — Sprint 4: CUDA Setup & Model Deploy
+## 2026-04-27 (Sunday) - 07:00 - Sprint 4: CUDA Setup & Model Deploy
 
 ### Sprint 4 Phase 1: Pure Local LLM Infrastructure ✅
 
 **Baseline:** 390 tests (preserved) · Regression: 59 (preserved)
 
-First-ever local LLM inference on VoxDesk — no Ollama, no cloud, pure llama-cpp-python.
+First-ever local LLM inference on VoxDesk - no Ollama, no cloud, pure llama-cpp-python.
 
 **What was done:**
 
@@ -473,19 +473,19 @@ First-ever local LLM inference on VoxDesk — no Ollama, no cloud, pure llama-cp
 **llama-cpp-python Build:**
 - Source-compiled llama-cpp-python 0.3.20 with CUDA 12.8
 - Build flags: `DGGML_CUDA=on`, `CMAKE_CUDA_ARCHITECTURES=120` (SM 12.0 Blackwell)
-- Result: `ggml-cuda.dll` (57 MB) — GPU kernel'ları dahil
+- Result: `ggml-cuda.dll` (57 MB) - GPU kernel'ları dahil
 - cmake 4.3.2 installed in venv for build
 
 **Model Deployment:**
 - Created `models/minicpm-v4.5-official/` directory structure
-- Downloaded `model-q6_k.gguf` (6.26 GB) — MiniCPM-V 4.5 Official Q6_K
-- Downloaded `mmproj-f16.gguf` (1.02 GB) — Vision projector (SigLip2-400M + 3D-Resampler)
+- Downloaded `model-q6_k.gguf` (6.26 GB) - MiniCPM-V 4.5 Official Q6_K
+- Downloaded `mmproj-f16.gguf` (1.02 GB) - Vision projector (SigLip2-400M + 3D-Resampler)
 - Source: `openbmb/MiniCPM-V-4_5-gguf` (official HuggingFace repo)
 - `models/minicpm-v4.5-abliterated/` klasörü hazır, indirmeye ben karar vereceğim
 
 **Config Update:**
 - `config/default.yaml` → `model_path` ve `mmproj_path` gerçek dosya yollarına güncellendi
-- Fallback paths abliterated model için ayrılmış (null — pending approval)
+- Fallback paths abliterated model için ayrılmış (null - pending approval)
 
 **First Inference:**
 - Model GPU'ya yüklendi (n_gpu_layers=-1, full offload)
@@ -494,11 +494,11 @@ First-ever local LLM inference on VoxDesk — no Ollama, no cloud, pure llama-cp
 - Inference latency: <2 saniye
 
 **Documentation Sync:**
-- `requirements.txt` — Sprint 4 header, SM 120 arch
-- `docs/architecture.md` — v0.2.0, Ollama→llama-cpp-python, model name güncellendi
-- `docs/dependency_matrix.md` — Tüm bağımlılıklar doğrulanmış (⏳→✅)
-- `docs/local_smoke_checklist.md` — LLM smoke eklendi, compute capability düzeltildi
-- `docs/PROGRESS.md` — Bu bölüm eklendi
+- `requirements.txt` - Sprint 4 header, SM 120 arch
+- `docs/architecture.md` - v0.2.0, Ollama→llama-cpp-python, model name güncellendi
+- `docs/dependency_matrix.md` - Tüm bağımlılıklar doğrulanmış (⏳→✅)
+- `docs/local_smoke_checklist.md` - LLM smoke eklendi, compute capability düzeltildi
+- `docs/PROGRESS.md` - Bu bölüm eklendi
 
 **Verification:**
 - 390 tests passing, 1 skipped ✅
@@ -513,7 +513,7 @@ First-ever local LLM inference on VoxDesk — no Ollama, no cloud, pure llama-cp
 
 ---
 
-## 2026-04-27 (Sunday) — 20:30 — Sprint 4.2+4.3: STT/TTS Pipeline + Translator
+## 2026-04-27 (Sunday) - 20:30 - Sprint 4.2+4.3: STT/TTS Pipeline + Translator
 
 ### Voice Pipeline Integration ✅
 
@@ -524,7 +524,7 @@ End-to-end voice pipeline: Mic → STT → Translator → LLM → TTS → Speake
 **What was done:**
 
 **System Dependencies:**
-- Installed espeak-ng 1.52.0 (Windows MSI) — required by Kokoro TTS phoneme engine
+- Installed espeak-ng 1.52.0 (Windows MSI) - required by Kokoro TTS phoneme engine
 - Set `PHONEMIZER_ESPEAK_LIBRARY` environment variable
 
 **Translator Module (`src/translator.py`):**
@@ -568,7 +568,7 @@ End-to-end voice pipeline: Mic → STT → Translator → LLM → TTS → Speake
 | Kokoro TTS | ~2 GB | ✅ 3 min |
 | MarianMT opus-mt-tr-en (float16) | ~146 MB | ✅ 3 min |
 | **Active total** | **~12.1 GB** | 76% of 16 GB |
-| **Idle total** | **~7 GB** | 44% — LLM only |
+| **Idle total** | **~7 GB** | 44% - LLM only |
 
 **Verification:**
 - 390 tests passing, 1 skipped ✅
@@ -579,7 +579,7 @@ End-to-end voice pipeline: Mic → STT → Translator → LLM → TTS → Speake
 
 ---
 
-## 2026-04-27 (Sunday) — Sprint 4.3: Full Repository Audit
+## 2026-04-27 (Sunday) - Sprint 4.3: Full Repository Audit
 
 ### Sprint 4.3: Full Repo Audit ✅
 
@@ -603,7 +603,7 @@ End-to-end voice pipeline: Mic → STT → Translator → LLM → TTS → Speake
 
 ---
 
-## 2026-04-27 (Sunday) — Sprint 5.0: System Prompt Architecture
+## 2026-04-27 (Sunday) - Sprint 5.0: System Prompt Architecture
 
 ### Sprint 5.0: Modular Prompt System ✅
 
@@ -613,21 +613,21 @@ End-to-end voice pipeline: Mic → STT → Translator → LLM → TTS → Speake
 
 **PersonalityConfig Expansion:**
 - Added 4 new modular prompt fields:
-  - `stt_context` — Whisper initial_prompt (domain vocabulary)
-  - `screen_analysis_prompt` — Ekran yorumlama talimatları
-  - `emotion_rules` — Duygu algılama/yansıtma filtresi
-  - `response_format` — Voice/text çıktı biçim kuralları
+  - `stt_context` - Whisper initial_prompt (domain vocabulary)
+  - `screen_analysis_prompt` - Ekran yorumlama talimatları
+  - `emotion_rules` - Duygu algılama/yansıtma filtresi
+  - `response_format` - Voice/text çıktı biçim kuralları
 
 **Voxly Prompt (Comprehensive):**
 - Core identity: professional, warm, context-aware desktop assistant
 - Screen analysis: code editors, terminals, browsers, video, games, photos, design tools, chat apps
-- Emotion rules: personality-as-filter — context → personality lens → response
+- Emotion rules: personality-as-filter - context → personality lens → response
 - Response format: voice = natural conversational language, text = markdown
 - Context-driven response depth: never artificially short/long, let context guide
 
 **LLM Prompt Composer:**
 - `_build_system_prompt(response_mode)` assembles all prompt sections
-- Empty sections skipped — simple personalities work with just system_prompt
+- Empty sections skipped - simple personalities work with just system_prompt
 - Voice mode appends `CURRENT MODE: Voice output` indicator
 - `response_mode` flows: chat()/chat_stream() → _build_messages() → _build_system_prompt()
 
@@ -654,9 +654,9 @@ End-to-end voice pipeline: Mic → STT → Translator → LLM → TTS → Speake
 
 ---
 
-## 2026-04-27 (Sunday) — Sprint 5.0 Audit: Exhaustive Fix
+## 2026-04-27 (Sunday) - Sprint 5.0 Audit: Exhaustive Fix
 
-### Sprint 5.0 Audit — 72 Dosya, 14 Bulgu, 7 Düzeltme ✅
+### Sprint 5.0 Audit - 72 Dosya, 14 Bulgu, 7 Düzeltme ✅
 
 **Baseline:** 421 → 444 tests
 
@@ -664,13 +664,13 @@ End-to-end voice pipeline: Mic → STT → Translator → LLM → TTS → Speake
 
 | # | Seviye | Bulgu | Düzeltme |
 |:--|:-------|:------|:---------|
-| 1 | 🔴 | LLMProvider protocol `response_mode` eksik | `protocols.py` — chat/chat_stream'e `response_mode` eklendi |
-| 2 | 🔴 | Debug metrics translator eksik | `main.py` — engines dict'e translator eklendi |
-| 3 | 🔴 | pyproject.toml translator deps eksik | `pyproject.toml` — transformers/sentencepiece/sacremoses eklendi |
-| 4 | 🔴 | STT `local_files_only` eksik | `stt.py` — WhisperModel'e `local_files_only=True` eklendi |
-| 7 | 🟡 | VISUAL_MEMO_PROMPT Türkçe | `types.py` — İngilizce'ye çevrildi |
-| 9 | 🟡 | opencv-python-headless gereksiz | `requirements.txt` — kaldırıldı |
-| 10 | 🟡 | Version 0.2.0 eski | `pyproject.toml` — 0.5.0'a yükseltildi |
+| 1 | 🔴 | LLMProvider protocol `response_mode` eksik | `protocols.py` - chat/chat_stream'e `response_mode` eklendi |
+| 2 | 🔴 | Debug metrics translator eksik | `main.py` - engines dict'e translator eklendi |
+| 3 | 🔴 | pyproject.toml translator deps eksik | `pyproject.toml` - transformers/sentencepiece/sacremoses eklendi |
+| 4 | 🔴 | STT `local_files_only` eksik | `stt.py` - WhisperModel'e `local_files_only=True` eklendi |
+| 7 | 🟡 | VISUAL_MEMO_PROMPT Türkçe | `types.py` - İngilizce'ye çevrildi |
+| 9 | 🟡 | opencv-python-headless gereksiz | `requirements.txt` - kaldırıldı |
+| 10 | 🟡 | Version 0.2.0 eski | `pyproject.toml` - 0.5.0'a yükseltildi |
 
 **Ertelenen Bulgular (Sprint 5.1):**
 - #5: Personality değişiminde STT initial_prompt güncellenmesi
@@ -678,8 +678,8 @@ End-to-end voice pipeline: Mic → STT → Translator → LLM → TTS → Speake
 - #8: `PUT /personality/{name}` route STT güncellenmesi
 
 **Yeni Test Dosyaları:**
-- `test_audit_regression.py` — 19 test (audit bulgu doğrulama)
-- `test_protocols.py` — +4 test (TranslatorEngine + response_mode)
+- `test_audit_regression.py` - 19 test (audit bulgu doğrulama)
+- `test_protocols.py` - +4 test (TranslatorEngine + response_mode)
 
 **Verification:**
 - 444 tests passing, 1 skipped ✅
@@ -687,7 +687,7 @@ End-to-end voice pipeline: Mic → STT → Translator → LLM → TTS → Speake
 
 ---
 
-## 2026-04-27 (Sunday) — Sprint 5.1: Final Wiring + Model Download
+## 2026-04-27 (Sunday) - Sprint 5.1: Final Wiring + Model Download
 
 ### Sprint 5.1: Personality→STT Wiring + Whisper Model ✅
 
@@ -698,7 +698,7 @@ End-to-end voice pipeline: Mic → STT → Translator → LLM → TTS → Speake
 - `config/default.yaml` → `stt.model_path` set edildi
 
 **Personality Swap → STT Context (#5, #8):**
-- `SpeechRecognizer.set_initial_prompt()` — runtime vocabulary güncelleme
+- `SpeechRecognizer.set_initial_prompt()` - runtime vocabulary güncelleme
 - `PUT /personality/{name}` → `state.stt.set_initial_prompt(personality.stt_context)` eklendi
 
 **Frontend stt_translated (#6):**
@@ -711,7 +711,7 @@ End-to-end voice pipeline: Mic → STT → Translator → LLM → TTS → Speake
 
 ---
 
-## 2026-04-28 (Monday) — Sprint 5.2: Audit Triage + Modality Matrix
+## 2026-04-28 (Monday) - Sprint 5.2: Audit Triage + Modality Matrix
 
 ### Sprint 5.2: 100-Bug Triage + Security Hardening ✅
 
@@ -722,20 +722,20 @@ End-to-end voice pipeline: Mic → STT → Translator → LLM → TTS → Speake
 - 38 active → 21 resolved, 7 kalan, 50 obsolete, 10 docs-only
 - Deduplicated 38 → 26 unique active bug
 
-**P1 — Security/Privacy/Runtime:**
+**P1 - Security/Privacy/Runtime:**
 - Path leak kapatıldı (`/api/settings`, `/api/models` → basename only)
 - Empty origin `""` → reject (BUG-013/074)
-- Google DNS TCP testi kaldırıldı — privacy (BUG-084)
+- Google DNS TCP testi kaldırıldı - privacy (BUG-084)
 - Base64 decode try/except (BUG-032)
 - PCM float32→int16 decode fix (BUG-069)
 - pyproject.toml try/except guard (BUG-015/077)
 
-**P2 — Voice Pipeline:**
+**P2 - Voice Pipeline:**
 - Legacy `response_mode="voice"` fix (BUG-001)
 - `/ws/voice` finally bloğu (BUG-002)
 - History O(n²)→O(n) trim + visual_memo (BUG-094)
 
-**P3 — Frontend:**
+**P3 - Frontend:**
 - XSS onclick→addEventListener (BUG-018/066)
 - Send button disabled during streaming (BUG-058/090)
 - btoa→arrayBufferToBase64 (BUG-020/082)
@@ -743,7 +743,7 @@ End-to-end voice pipeline: Mic → STT → Translator → LLM → TTS → Speake
 - audio.play().catch() (BUG-076)
 - ttsToggle/vaToggle backend wiring (BUG-067)
 
-**P4 — Infrastructure:**
+**P4 - Infrastructure:**
 - All 4 WS handlers check connect() return (BUG-009/010)
 - PUT /model documented as stub (BUG-048)
 - TTS/VA toggle backend endpoints added
@@ -754,47 +754,47 @@ End-to-end voice pipeline: Mic → STT → Translator → LLM → TTS → Speake
 
 **Verification:**
 - 474 tests passing, 9 pre-existing failed, 0 regressions ✅
-- `test_sprint52_fixes.py` — 30 targeted regression tests
+- `test_sprint52_fixes.py` - 30 targeted regression tests
 
 ---
 
-## 2026-04-28 (Monday) — Sprint 5.3: Final Runtime Fixes
+## 2026-04-28 (Monday) - Sprint 5.3: Final Runtime Fixes
 
 ### Sprint 5.3: Voice+Screen Completion + Race Condition + Infrastructure ✅
 
 **Baseline:** 474 → 484 tests
 
-**P1 — Voice+Screen TTS Exception:**
+**P1 - Voice+Screen TTS Exception:**
 - TTS section now wrapped in try/except
 - Structured error: `code: TTS_FAILED`, `recoverable: true`
 - `record_error()` + `tts_errors_total` metric
 - Voice+Screen artık "kısmi" değil, kontrollü hata yönetimine sahip
 
-**P2 — Model Load Race Condition:**
+**P2 - Model Load Race Condition:**
 - `threading.Event` (_load_event) eklendi
 - İkinci caller mevcut load'un bitmesini bekler (max 120s)
 - Load sahipliği flag-based (should_load/should_wait)
 - **Deadlock düzeltildi:** `_do_load()` lock dışına çıkarıldı
 - Concurrent load test eklendi
 
-**P3 — SecurityConfig Enforcement:**
+**P3 - SecurityConfig Enforcement:**
 - `audio_protocol.py` frame limitleri config-backed (`get_max_frame_bytes()`)
 - `SecurityConfig.max_ws_frame_bytes` artık runtime'da enforced
 
-**P4 — ScreenCapture Protocol:**
+**P4 - ScreenCapture Protocol:**
 - `health()` → running, buffer_count, has_camera, has_pin raporu
 - `close()` → stop + buffer clear + pin clear
 - `stop()` → dxcam `camera.release()` (proper API)
 
-**P5 — VRAM Async Safety:**
+**P5 - VRAM Async Safety:**
 - `safe_unload()` → `loop.run_in_executor()` ile çağrılıyor
 - Event loop block riski ortadan kalktı
 
-**P6 — PTT Release Modifier:**
+**P6 - PTT Release Modifier:**
 - Her modifier key'e `on_release_key` handler eklendi
 - Ctrl bırakıldığında da PTT kapanıyor
 
-**P7 — Tray Quit Wiring:**
+**P7 - Tray Quit Wiring:**
 - `on_quit=_tray_quit` callback set edildi
 - `SIGINT` sinyali ile uvicorn graceful shutdown tetikleniyor
 - `_safe_shutdown()` tüm bileşenleri kapatıyor
@@ -806,34 +806,34 @@ End-to-end voice pipeline: Mic → STT → Translator → LLM → TTS → Speake
 
 ---
 
-## 2026-04-29 (Wednesday) — Sprint 5.3: Multimodal Pipeline Optimization (Part 1.5 - Part 5b)
+## 2026-04-29 (Wednesday) - Sprint 5.3: Multimodal Pipeline Optimization (Part 1.5 - Part 5b)
 
 ### Sprint 5.3: Vision Pipeline & Qwen3-VL Feasibility ✅
 
 **Baseline:** 484 tests → 568 tests (+84)
 
-**Part 1.5 — Image Metadata & Debug Export:**
+**Part 1.5 - Image Metadata & Debug Export:**
 - Added ImageMetadata extraction (source, resolution, format, byte size, hash).
 - Added `export_to_disk` for exact LLM inference payload verification.
 - Enforced strict privacy rule: no automatic disk writes, no EXIF stripping without consent.
 
-**Part 2 — Canonical Image Artifact:**
+**Part 2 - Canonical Image Artifact:**
 - Replaced fragmented image payloads with `CanonicalImageArtifact`.
 - Unified `ws_screen`, `pinned_frame`, and `grab_now` formats into a single artifact structure.
 - Removed base64 data from historical logs (saved to `scratch/` only when exported).
 
-**Part 3 — Capture & Upload Quality Parity:**
+**Part 3 - Capture & Upload Quality Parity:**
 - Unified local screenshot and uploaded image quality settings.
 - Increased inference image quality to 1920px (max) and Q92 to match standard uploads.
 - Preserved 1280px/Q85 for websocket preview frames.
 
-**Part 4 & 4b — Handler Fix & Visual Budget Plumbing:**
+**Part 4 & 4b - Handler Fix & Visual Budget Plumbing:**
 - Refactored `LlamaCppProvider` to support specific vision handlers via pattern matching.
 - Implemented handler resolution hierarchy: Gemma4/3, Qwen3VL, Qwen25VL, MiniCPM, Llava.
 - Added visual token budget mechanisms: `n_ubatch` parameter and predefined presets (`screen_fast`, `screen_balanced`, `screen_ocr`).
 - Hardened provider to fail loudly (clear error) rather than silently fallback when a specialized handler is missing.
 
-**Part 5 & 5b — Qwen3-VL Readiness & Feasibility Check:**
+**Part 5 & 5b - Qwen3-VL Readiness & Feasibility Check:**
 - Confirmed Qwen3-VL-8B as the primary candidate for UI/Screen understanding (superior OCR and agentic perception).
 - Discovered `Qwen3VLChatHandler` is currently missing from `llama-cpp-python` v0.3.21 on PyPI.
 - Validated that `JamePeng` fork contains the handler via direct source inspection.
@@ -842,8 +842,8 @@ End-to-end voice pipeline: Mic → STT → Translator → LLM → TTS → Speake
 
 **Test Cleanup (9 pre-existing failures → 0 failures):**
 - 6 outdated test assertions updated to match current production behavior (Türkçe voice mode indicator, empty emotion_rules, Part 2 image artifact architecture).
-- 1 safety guard restored: `voxly.yaml` SAFETY kuralı eklendi (refusal of harmful/unsafe/illegal — önceki prompt rewrite'da kaybolmuştu).
-- 3 unimplemented feature tests (`stt_translated` frontend handler) marked `@pytest.mark.xfail` — Sprint 5 backlog.
+- 1 safety guard restored: `voxly.yaml` SAFETY kuralı eklendi (refusal of harmful/unsafe/illegal - önceki prompt rewrite'da kaybolmuştu).
+- 3 unimplemented feature tests (`stt_translated` frontend handler) marked `@pytest.mark.xfail` - Sprint 5 backlog.
 
 **Verification:**
 - 594 tests passing, 3 xfailed (backlog), 0 failures, 0 regressions ✅
@@ -855,41 +855,41 @@ End-to-end voice pipeline: Mic → STT → Translator → LLM → TTS → Speake
 
 ---
 
-### Sprint 8 — Local Gemma4 Sidecar Integration (2026-05-04)
+### Sprint 8 - Local Gemma4 Sidecar Integration (2026-05-04)
 
 **Goal:** Migrate LLM inference from in-process llama-cpp-python to a local llama-server sidecar for Gemma4 vision support.
 
 **What was done:**
-- `LocalLlamaServerProvider` — OpenAI-compatible HTTP client via httpx, localhost-only (`http://127.0.0.1`)
-- `SidecarManager` — subprocess lifecycle (auto-start, health-check, graceful shutdown) for llama-server.exe
-- `LocalLlamaServerConfig` — Pydantic config model with model/mmproj/executable paths, port, inference params
-- Lifespan integration — sidecar starts at app startup, stops at shutdown
+- `LocalLlamaServerProvider` - OpenAI-compatible HTTP client via httpx, localhost-only (`http://127.0.0.1`)
+- `SidecarManager` - subprocess lifecycle (auto-start, health-check, graceful shutdown) for llama-server.exe
+- `LocalLlamaServerConfig` - Pydantic config model with model/mmproj/executable paths, port, inference params
+- Lifespan integration - sidecar starts at app startup, stops at shutdown
 - `/api/status` extended with `llm_provider`, `sidecar`, `has_vision` fields
 - Gemma4 uncensored model downloaded: `Gemma-4-E4B-Uncensored-HauhauCS-Aggressive-Q8_K_P.gguf` + mmproj f16
 - Privacy: base64 image data never logged, remote URLs rejected at constructor, `0.0.0.0` binding forbidden
 - `config/default.yaml` switched from `llama-cpp` to `local-llama-server` provider
-- `test_sprint8_local_server.py` — regression tests for provider, sidecar config, localhost enforcement
+- `test_sprint8_local_server.py` - regression tests for provider, sidecar config, localhost enforcement
 
 **Architecture decision:**
 - "OpenAI-compatible" = local JSON API format only, NOT OpenAI cloud
-- Sidecar uses libmtmd for vision (mmproj) — `Gemma4ChatHandler` in llama-cpp-python is no longer a blocker
+- Sidecar uses libmtmd for vision (mmproj) - `Gemma4ChatHandler` in llama-cpp-python is no longer a blocker
 - Dev executable path: Docker Desktop's llama-server.exe (temporary, documented as dev-only)
 - Production: bundled llama-server.exe next to VoxDesk.exe
 
 ---
 
-### Sprint 8.1 — Codebase Integrity, Privacy, State Truthfulness, Documentation (2026-05-05)
+### Sprint 8.1 - Codebase Integrity, Privacy, State Truthfulness, Documentation (2026-05-05)
 
 **Root Cause: Full codebase integrity audit identified 23 findings across 5 severity levels.**
 
 **Critical Fixes:**
-- **C-02 PRIVACY FIX**: Legacy `/ws/voice` route now respects `screen_context_enabled`. Previously, this route always sent screen artifacts to LLM even when screen capture was toggled OFF — violating the privacy contract. All 4 voice/chat paths now enforce the same policy.
+- **C-02 PRIVACY FIX**: Legacy `/ws/voice` route now respects `screen_context_enabled`. Previously, this route always sent screen artifacts to LLM even when screen capture was toggled OFF - violating the privacy contract. All 4 voice/chat paths now enforce the same policy.
 - **C-01 STATE FIX**: `_screen_context_enabled` and `_voice_activation_enabled` are now declared fields in `AppState` dataclass instead of ad-hoc attributes set via `setattr/getattr`. All consumers updated to use direct field access.
 
 **High/Medium Fixes:**
 - `httpx>=0.27.0` added to `requirements.txt` and `pyproject.toml` as explicit runtime dependency.
-- `MetricsCollector` now pre-registers `model_loaded_llm` and `model_loaded_translator` flags — previously silently dropped by `set_flag()`.
-- `HistoryConfig.auto_save` and `save_path` marked as BACKLOG in config comments — prevents users from thinking they work.
+- `MetricsCollector` now pre-registers `model_loaded_llm` and `model_loaded_translator` flags - previously silently dropped by `set_flag()`.
+- `HistoryConfig.auto_save` and `save_path` marked as BACKLOG in config comments - prevents users from thinking they work.
 - All `getattr(state, '_screen_context_enabled', True)` patterns replaced with `state.screen_context_enabled`.
 - All `getattr(state, '_voice_activation_enabled', ...)` patterns replaced with `state.voice_activation_enabled`.
 
@@ -903,8 +903,8 @@ End-to-end voice pipeline: Mic → STT → Translator → LLM → TTS → Speake
 - `test_sprint81_integrity.py`: Comprehensive regression tests for all Sprint 8.1 fixes.
 
 **Backlog (remaining from audit):**
-- `voice_v2._handle_legacy_audio` duplicates `_process_audio_buffer` pipeline — TODO for shared extraction.
-- `check_origin()` allows missing Origin header — acceptable for localhost-only app, documented.
-- POST `/api/chat` consumes pinned frame silently — low priority.
-- EXE packaging: `executable_path` still points to dev Docker path — documented as dev-only.
+- `voice_v2._handle_legacy_audio` duplicates `_process_audio_buffer` pipeline - TODO for shared extraction.
+- `check_origin()` allows missing Origin header - acceptable for localhost-only app, documented.
+- POST `/api/chat` consumes pinned frame silently - low priority.
+- EXE packaging: `executable_path` still points to dev Docker path - documented as dev-only.
 - Full installer/packaging not implemented this sprint.

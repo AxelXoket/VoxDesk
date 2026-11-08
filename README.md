@@ -15,19 +15,19 @@
 
 ---
 
-VoxDesk is a privacy-first AI assistant that runs **entirely on your machine**. It watches your screen, listens to your voice, and responds with intelligent analysis — all without sending a single byte to the cloud.
+VoxDesk is a privacy-first AI assistant that runs **entirely on your machine**. It watches your screen, listens to your voice, and responds with intelligent analysis - all without sending a single byte to the cloud.
 
 ## Features
 
-- **Real-Time Screen Analysis** — Continuously captures your screen and provides intelligent context-aware answers about what you're working on
-- **Voice Chat** — Speak naturally and get spoken responses via local STT (Whisper) and TTS (Kokoro)
-- **100% Local & Private** — No cloud APIs, no telemetry, no CDN assets. Your data never leaves your machine
-- **Vision LLM** — Gemma 4 E4B via local llama-server sidecar (OpenAI-compatible local API, not cloud) with multimodal projector (mmproj)
-- **Model Agnostic** — Any GGUF model works — just drop the file and update config
-- **Binary Audio Protocol** — High-performance PCM audio transfer over WebSocket with AudioWorklet support
-- **Glassmorphism UI** — Premium dark-themed interface with smooth animations and responsive design
-- **Modular Architecture** — Plugin-ready module registry with dependency injection and fail-fast config validation
-- **VRAM Management** — Intelligent model lifecycle with idle unloading, ref-count guards, and state machine transitions
+- **Real-Time Screen Analysis** - Continuously captures your screen and provides intelligent context-aware answers about what you're working on
+- **Voice Chat** - Speak naturally and get spoken responses via local STT (Whisper) and TTS (Kokoro)
+- **100% Local & Private** - No cloud APIs, no telemetry, no CDN assets. Your data never leaves your machine
+- **Vision LLM** - Gemma 4 E4B via local llama-server sidecar (OpenAI-compatible local API, not cloud) with multimodal projector (mmproj)
+- **Model Agnostic** - Any GGUF model works - just drop the file and update config
+- **Binary Audio Protocol** - High-performance PCM audio transfer over WebSocket with AudioWorklet support
+- **Glassmorphism UI** - Premium dark-themed interface with smooth animations and responsive design
+- **Modular Architecture** - Plugin-ready module registry with dependency injection and fail-fast config validation
+- **VRAM Management** - Intelligent model lifecycle with idle unloading, ref-count guards, and state machine transitions
 
 ## Architecture
 
@@ -76,8 +76,8 @@ VoxDesk is a privacy-first AI assistant that runs **entirely on your machine**. 
 
 - **Python 3.12+** (3.12.10 recommended)
 - **NVIDIA GPU** with CUDA support (RTX 5080 / Blackwell tested)
-- **CUDA Toolkit 12.8** — [Download](https://developer.nvidia.com/cuda-12-8-0-download-archive)
-- **espeak-ng** — Required by Kokoro TTS ([download](https://github.com/espeak-ng/espeak-ng/releases))
+- **CUDA Toolkit 12.8** - [Download](https://developer.nvidia.com/cuda-12-8-0-download-archive)
+- **espeak-ng** - Required by Kokoro TTS ([download](https://github.com/espeak-ng/espeak-ng/releases))
 
 ### Installation
 
@@ -126,7 +126,7 @@ local_llama_server:
   executable_path: "path/to/llama-server.exe"
 ```
 
-> **"OpenAI-compatible" means local API format only** — VoxDesk uses the OpenAI JSON schema
+> **"OpenAI-compatible" means local API format only** - VoxDesk uses the OpenAI JSON schema
 > (`/v1/chat/completions`) to communicate with the local llama-server on `127.0.0.1`.
 > **No data is sent to OpenAI or any cloud service.** This is strictly a local protocol.
 
@@ -168,11 +168,11 @@ Then open **http://127.0.0.1:8765** in your browser.
 VoxDesk runs a **local llama-server subprocess** (sidecar) for LLM inference:
 
 - Model: Gemma 4 E4B (GGUF) + multimodal projector (mmproj via libmtmd)
-- Protocol: OpenAI-compatible `/v1/chat/completions` — **local API format only, not OpenAI cloud**
+- Protocol: OpenAI-compatible `/v1/chat/completions` - **local API format only, not OpenAI cloud**
 - Transport: `httpx` → `http://127.0.0.1:8081` (localhost only, remote URLs rejected)
 - Vision: `image_url` with `data:image/jpeg;base64,...` payload (never logged)
-- Lifecycle: App-managed — auto-start, health-check, graceful shutdown
-- Handler blocker: `Gemma4ChatHandler` is **not needed** — sidecar uses libmtmd natively
+- Lifecycle: App-managed - auto-start, health-check, graceful shutdown
+- Handler blocker: `Gemma4ChatHandler` is **not needed** - sidecar uses libmtmd natively
 
 ### Fallback: `llama-cpp` (In-Process)
 
@@ -185,7 +185,7 @@ VoxDesk runs a **local llama-server subprocess** (sidecar) for LLM inference:
 | `llava` | `Llava16ChatHandler` | ✅ Available |
 | `gemma-4`, `gemma4`, `e4b` | `Gemma4ChatHandler` | ⏳ Not in llama-cpp-python yet |
 
-> **Note**: Gemma4 vision is fully supported via sidecar — the missing `Gemma4ChatHandler` in llama-cpp-python is no longer a blocker.
+> **Note**: Gemma4 vision is fully supported via sidecar - the missing `Gemma4ChatHandler` in llama-cpp-python is no longer a blocker.
 
 ### EXE Packaging Plan
 
@@ -198,9 +198,9 @@ VoxDesk/
     gemma-4-E4B-uncensored/
       *.gguf
 ```
-Models are **not embedded** in the executable — shipped separately or downloaded via installer.
+Models are **not embedded** in the executable - shipped separately or downloaded via installer.
 
-## VRAM Budget (RTX 5080 — 16 GB)
+## VRAM Budget (RTX 5080 - 16 GB)
 
 | Component | Est. VRAM | Idle Unload | Notes |
 |:---|:---:|:---:|:---|
@@ -251,7 +251,7 @@ These guarantees are backed by **85+ automated regression tests** that scan for 
 |:---|:---|:---|
 | `GET /` | HTTP | Frontend (index.html) |
 | `GET /api/health` | HTTP | Minimal health check (safe to expose) |
-| `GET /api/status` | HTTP | Runtime snapshot — models, features, connections |
+| `GET /api/status` | HTTP | Runtime snapshot - models, features, connections |
 | `GET /api/debug/metrics` | HTTP | Full metrics (gated by feature flag, returns 403 when disabled) |
 | `GET /api/history` | HTTP | Chat history export |
 | `GET/POST /api/settings` | HTTP | Runtime config viewer/editor |
@@ -273,7 +273,7 @@ tone: "professional"
 greeting: "Hello! How can I help?"
 
 system_prompt: |
-  You are MyAssistant — a helpful AI desktop companion.
+  You are MyAssistant - a helpful AI desktop companion.
   Rules:
   - Be helpful and concise
   - Analyze the user's screen when asked
@@ -325,7 +325,7 @@ python run_tests.py --bench
 
 > Test counts are approximate and grow with each sprint. Run `pytest --co -q` for exact count.
 
-**Current coverage: ~65%** — Minimum threshold: 55%
+**Current coverage: ~65%** - Minimum threshold: 55%
 
 ## Project Structure
 
@@ -335,17 +335,17 @@ VoxDesk/
 │   ├── main.py                     # FastAPI app, lifespan, health/status/metrics endpoints
 │   ├── config.py                   # 13 Pydantic config models (all extra='forbid')
 │   ├── llm/
-│   │   ├── local_server_provider.py # LocalLlamaServerProvider — sidecar HTTP client (primary)
-│   │   ├── sidecar.py              # SidecarManager — llama-server subprocess lifecycle
-│   │   ├── provider.py             # LlamaCppProvider — in-process GGUF inference (fallback)
+│   │   ├── local_server_provider.py # LocalLlamaServerProvider - sidecar HTTP client (primary)
+│   │   ├── sidecar.py              # SidecarManager - llama-server subprocess lifecycle
+│   │   ├── provider.py             # LlamaCppProvider - in-process GGUF inference (fallback)
 │   │   ├── types.py                # ChatMessage, prompt builder
 │   │   └── history.py              # Conversation history manager
 │   ├── stt.py                      # faster-whisper STT with ManagedModel lifecycle
 │   ├── tts.py                      # Kokoro TTS with ManagedModel lifecycle
 │   ├── translator.py               # MarianMT TR→EN with ManagedModel lifecycle
 │   ├── capture.py                  # DXCam screen capture + dual quality path
-│   ├── image_artifact.py           # CanonicalImageArtifact — unified image interface
-│   ├── image_metadata.py           # ImageMetadata — source/resolution/hash tracking
+│   ├── image_artifact.py           # CanonicalImageArtifact - unified image interface
+│   ├── image_metadata.py           # ImageMetadata - source/resolution/hash tracking
 │   ├── vram_manager.py             # GPU memory lifecycle + idle unload monitor
 │   ├── model_state.py              # ManagedModel state machine (5 unload guards)
 │   ├── registry.py                 # Module registry (dependency injection)
@@ -354,12 +354,12 @@ VoxDesk/
 │   ├── audio_utils.py              # PCM decode/encode helpers
 │   ├── isolation.py                # Network isolation enforcer
 │   ├── websocket_manager.py        # WebSocket lifecycle + origin validation
-│   ├── metrics.py                  # MetricsCollector — sliding-window percentiles
+│   ├── metrics.py                  # MetricsCollector - sliding-window percentiles
 │   ├── hotkey.py                   # Global keyboard shortcuts
 │   ├── tray.py                     # System tray icon
 │   └── routes/                     # API route handlers
 │       ├── chat.py                 # /ws/chat, /ws/screen, /ws/voice, POST /chat
-│       ├── voice_v2.py             # /ws/voice/v2 — binary PCM audio
+│       ├── voice_v2.py             # /ws/voice/v2 - binary PCM audio
 │       ├── history.py              # GET /api/history
 │       └── settings.py             # GET/POST /api/settings
 ├── frontend/                       # Browser UI (served as static files)
@@ -395,7 +395,7 @@ VoxDesk/
 
 ## Configuration
 
-All configuration lives in `config/default.yaml` with **14 strict Pydantic models** (`extra='forbid'` — typos cause startup failure):
+All configuration lives in `config/default.yaml` with **14 strict Pydantic models** (`extra='forbid'` - typos cause startup failure):
 
 ```yaml
 app:
@@ -411,8 +411,8 @@ llm:
 
 local_llama_server:
   enabled: true
-  executable_path: ""             # REQUIRED — set to local llama-server.exe path
-  base_url: "http://127.0.0.1:8081"  # localhost only — remote rejected
+  executable_path: ""             # REQUIRED - set to local llama-server.exe path
+  base_url: "http://127.0.0.1:8081"  # localhost only - remote rejected
   port: 8081
   auto_start: true
   jinja: true                     # required for Gemma4
@@ -438,11 +438,11 @@ privacy:
 
 ## Roadmap
 
-- [x] Pure local inference — no cloud APIs, no Ollama dependency
+- [x] Pure local inference - no cloud APIs, no Ollama dependency
 - [x] CUDA 12.8 + RTX 5080 Blackwell support
 - [x] **Gemma 4 E4B vision via local llama-server sidecar** (primary provider)
-- [x] LocalLlamaServerProvider — localhost-only httpx client
-- [x] SidecarManager — subprocess lifecycle (start/health/shutdown)
+- [x] LocalLlamaServerProvider - localhost-only httpx client
+- [x] SidecarManager - subprocess lifecycle (start/health/shutdown)
 - [x] Qwen2.5-VL-7B + MiniCPM-V fallback (in-process llama-cpp-python)
 - [x] Binary PCM WebSocket protocol
 - [x] VRAM idle unload with 5-guard state machine
@@ -461,10 +461,10 @@ privacy:
 
 ## License
 
-This project is licensed under the GNU General Public License v3.0 — see the [LICENSE](LICENSE) file for details.
+This project is licensed under the GNU General Public License v3.0 - see the [LICENSE](LICENSE) file for details.
 
 ---
 
 <p align="center">
-  <sub>Built with privacy in mind — your data stays on your machine, always.</sub>
+  <sub>Built with privacy in mind - your data stays on your machine, always.</sub>
 </p>

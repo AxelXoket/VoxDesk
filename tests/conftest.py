@@ -1,5 +1,5 @@
 """
-VoxDesk — Test Configuration & Shared Fixtures
+VoxDesk - Test Configuration & Shared Fixtures
 Tüm test dosyalarında kullanılan ortak fixture'lar ve autouse cleanup.
 """
 
@@ -10,14 +10,14 @@ from unittest.mock import MagicMock, AsyncMock, patch
 
 
 # ══════════════════════════════════════════════════════════════
-#  Global State Cleanup — Autouse (function scope)
+#  Global State Cleanup - Autouse (function scope)
 # ══════════════════════════════════════════════════════════════
 
 @pytest.fixture(autouse=True)
 def _reset_global_state():
     """
     Her test sonrası tüm global state'leri sıfırla.
-    Test izolasyonu için kritik — testler birbirini etkilemez.
+    Test izolasyonu için kritik - testler birbirini etkilemez.
     """
     yield
 
@@ -25,13 +25,13 @@ def _reset_global_state():
     import src.config as cfg_mod
     cfg_mod._config = None
 
-    # AppState singleton reset — metrics önce temizle
+    # AppState singleton reset - metrics önce temizle
     import src.main as main_mod
     if main_mod._state is not None and hasattr(main_mod._state, 'metrics'):
         try:
             main_mod._state.metrics.reset_for_tests()
         except Exception:
-            pass  # Defensive — cleanup asla fail etmemeli
+            pass  # Defensive - cleanup asla fail etmemeli
     main_mod._state = None
 
 
@@ -43,7 +43,7 @@ def _reset_global_state():
 def make_llm(tmp_path):
     """
     Mock config ile LlamaCppProvider factory.
-    Fake GGUF dosyası oluşturur — path validation geçer, model yüklemez.
+    Fake GGUF dosyası oluşturur - path validation geçer, model yüklemez.
 
     Usage:
         def test_something(make_llm):
@@ -147,7 +147,7 @@ def make_fake_audio():
 
 @pytest.fixture
 def mock_websocket():
-    """Fully mocked WebSocket — all send/receive methods + voice_v2 support."""
+    """Fully mocked WebSocket - all send/receive methods + voice_v2 support."""
     ws = AsyncMock()
     ws.accept = AsyncMock()
     ws.send_json = AsyncMock()

@@ -1,5 +1,5 @@
 /**
- * VoxDesk — Screen Preview
+ * VoxDesk - Screen Preview
  * WebSocket üzerinden canlı ekran görüntüsü.
  * Sprint 7.2: Honors window.voxScreenEnabled flag.
  */

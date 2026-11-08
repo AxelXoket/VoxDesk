@@ -1,7 +1,7 @@
 """
-VoxDesk — LLM Tests (Sprint 4)
+VoxDesk - LLM Tests (Sprint 4)
 ChatMessage, ConversationHistory, LlamaCppProvider.
-GPU veya model GEREKMİYOR — tüm çağrılar mock'lanır.
+GPU veya model GEREKMİYOR - tüm çağrılar mock'lanır.
 """
 
 import pytest
@@ -154,7 +154,7 @@ class TestConversationHistory:
 
 
 # ══════════════════════════════════════════════════════════════
-#  LlamaCppProvider — Construction & Validation
+#  LlamaCppProvider - Construction & Validation
 # ══════════════════════════════════════════════════════════════
 
 class TestProviderConstruction:
@@ -255,7 +255,7 @@ class TestProviderConstruction:
 
 
 # ══════════════════════════════════════════════════════════════
-#  LlamaCppProvider — Message Building
+#  LlamaCppProvider - Message Building
 # ══════════════════════════════════════════════════════════════
 
 class TestProviderMessageBuilding:
@@ -364,7 +364,7 @@ class TestProviderMessageBuilding:
 
 
 # ══════════════════════════════════════════════════════════════
-#  LlamaCppProvider — History Delegation
+#  LlamaCppProvider - History Delegation
 # ══════════════════════════════════════════════════════════════
 
 class TestProviderHistoryDelegation:
@@ -417,7 +417,7 @@ class TestProviderHistoryDelegation:
 
 
 # ══════════════════════════════════════════════════════════════
-#  LlamaCppProvider — Chat (Mocked llama-cpp)
+#  LlamaCppProvider - Chat (Mocked llama-cpp)
 # ══════════════════════════════════════════════════════════════
 
 class TestProviderChatMocked:

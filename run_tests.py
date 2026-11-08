@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-VoxDesk — Test Runner
-Thin pytest wrapper — pyproject.toml is the source of truth.
+VoxDesk - Test Runner
+Thin pytest wrapper - pyproject.toml is the source of truth.
 Config values (markers, coverage threshold) come from pyproject.toml, not duplicated here.
 
 Usage:
@@ -35,7 +35,7 @@ def main():
     elif "--quick" in args:
         cmd = ["pytest", "-m", "unit or regression", "-v"]
     else:
-        # Full suite — coverage from pyproject.toml
+        # Full suite - coverage from pyproject.toml
         cmd = [
             "pytest",
             "--cov=src",

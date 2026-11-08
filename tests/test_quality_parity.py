@@ -1,5 +1,5 @@
 """
-VoxDesk — Sprint 5.3 Part 3 Tests
+VoxDesk - Sprint 5.3 Part 3 Tests
 Capture/Upload Quality Parity: preview vs inference profiles.
 """
 
@@ -181,7 +181,7 @@ class TestUploadUnchanged:
         original = buf.getvalue()
 
         art = build_artifact_from_upload(original, jpeg_quality=92)
-        assert art.image_bytes is original  # identity — no recompress
+        assert art.image_bytes is original  # identity - no recompress
 
 
 # ── History Policy ──────────────────────────────────────────────

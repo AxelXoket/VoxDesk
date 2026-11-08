@@ -1,6 +1,6 @@
 """
-VoxDesk — Capture, WebSocket Manager, Isolation, Hotkey, Tray Tests
-Alt sistemlerin unit testleri — hardware gerektirmez.
+VoxDesk - Capture, WebSocket Manager, Isolation, Hotkey, Tray Tests
+Alt sistemlerin unit testleri - hardware gerektirmez.
 """
 
 import os
@@ -435,7 +435,7 @@ class TestHotkeyManager:
         assert parts[:-1] == ["ctrl", "alt"]
 
     def test_ptt_key_parsing_single_key(self):
-        """Tek tuşlu PTT — modifier yok."""
+        """Tek tuşlu PTT - modifier yok."""
         hk = HotkeyManager(push_to_talk_key="f5")
         parts = hk.push_to_talk_key.split("+")
         assert parts[-1] == "f5"

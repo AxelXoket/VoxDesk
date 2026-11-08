@@ -1,6 +1,6 @@
 ﻿"""
-VoxDesk — WebSocket Binary Handler Tests
-voice_v2.py handler logic — handshake, binary dispatch, error responses.
+VoxDesk - WebSocket Binary Handler Tests
+voice_v2.py handler logic - handshake, binary dispatch, error responses.
 Gerçek mikrofon KULLANILMAZ. FastAPI TestClient WebSocket mock.
 """
 
@@ -23,7 +23,7 @@ from src.audio_protocol import (
 
 
 # ══════════════════════════════════════════════════════════════
-#  WebSocket Handler Logic — Unit Tests
+#  WebSocket Handler Logic - Unit Tests
 #  (Handler'ı doğrudan çağırmak yerine logic'i test ederiz)
 # ══════════════════════════════════════════════════════════════
 
@@ -217,7 +217,7 @@ class TestFrontendSecurity:
 
 
 # ══════════════════════════════════════════════════════════════
-#  Route File Guard — voice_v2 src.registry import etmemeli
+#  Route File Guard - voice_v2 src.registry import etmemeli
 # ══════════════════════════════════════════════════════════════
 
 class TestVoiceV2RouteGuard:

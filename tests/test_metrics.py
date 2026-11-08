@@ -1,5 +1,5 @@
 ﻿"""
-VoxDesk — Metrics Collector Tests
+VoxDesk - Metrics Collector Tests
 MetricsCollector thread-safety, sliding-window percentile,
 counters, gauges, VRAM report, and reset semantics.
 """
@@ -161,7 +161,7 @@ class TestVRAMReport:
     def test_vram_report_import_error(self):
         """VRAM report handles torch import failure gracefully."""
         m = MetricsCollector()
-        # Real call — if torch isn't available, should not crash
+        # Real call - if torch isn't available, should not crash
         report = m.get_vram_report()
         assert "cuda_available" in report
 

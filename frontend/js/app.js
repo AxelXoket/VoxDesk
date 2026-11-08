@@ -1,5 +1,5 @@
 /**
- * VoxDesk — Main Application
+ * VoxDesk - Main Application
  * Tüm bileşenleri başlatır ve bağlar.
  */
 
@@ -19,14 +19,14 @@ document.addEventListener('DOMContentLoaded', () => {
     checkHealth();
     setInterval(checkHealth, 30000);
 
-    // Sprint 7: Full Voice Mode — initialize
+    // Sprint 7: Full Voice Mode - initialize
     let voxFullVoice = null;
     if (window.FullVoiceMode) {
         voxFullVoice = new FullVoiceMode();
         window.VoxFullVoice = voxFullVoice;
     }
 
-    // Voice mode button — now toggles Full Voice Mode
+    // Voice mode button - now toggles Full Voice Mode
     const voiceModeBtn = document.getElementById('btnVoiceMode');
 
     voiceModeBtn.addEventListener('click', () => {
@@ -42,7 +42,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Legacy fallback (no FVM) — Sprint 7.1: simplified, voiceModeActive removed
+        // Legacy fallback (no FVM) - Sprint 7.1: simplified, voiceModeActive removed
         const voiceIndicator = document.getElementById('voiceIndicator');
         const nowActive = voiceIndicator && voiceIndicator.style.display !== 'flex';
         if (voiceIndicator) voiceIndicator.style.display = nowActive ? 'flex' : 'none';
@@ -63,7 +63,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Mic button — Click toggle recording (click to start, click to stop)
+    // Mic button - Click toggle recording (click to start, click to stop)
     const micBtn = document.getElementById('btnMic');
     let audioCapture = null;
     let silenceTimer = null;
@@ -94,7 +94,7 @@ document.addEventListener('DOMContentLoaded', () => {
             audioCapture = new AudioCapture(transport, { useBinary });
             await audioCapture.start();
 
-            // 5-second silence warning — only if mic failed silently
+            // 5-second silence warning - only if mic failed silently
             silenceTimer = setTimeout(() => {
                 if (audioCapture && audioCapture.isRecording && !audioCapture._mode) {
                     window.VoxChat.addMessage('assistant', '⚠️ Mikrofon başlatılamadı. Tarayıcı izinlerini kontrol edin.');
@@ -120,7 +120,7 @@ document.addEventListener('DOMContentLoaded', () => {
     micBtn.addEventListener('click', async () => {
         // Sprint 7.1: Block dictation while Full Voice Mode is active
         if (voxFullVoice && voxFullVoice.isActive) {
-            console.warn('[App] Dictation blocked — Full Voice Mode is active');
+            console.warn('[App] Dictation blocked - Full Voice Mode is active');
             return;
         }
         if (audioCapture && audioCapture.isRecording) {
@@ -130,7 +130,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Voice WS events — TTS audio queue (chunk'lar sıralı çalınır)
+    // Voice WS events - TTS audio queue (chunk'lar sıralı çalınır)
     const ttsQueue = [];
     let ttsPlaying = false;
 
@@ -165,7 +165,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Sprint 3.5: Voice close/error cleanup — stop AudioCapture safely
+    // Sprint 3.5: Voice close/error cleanup - stop AudioCapture safely
     function _cleanupVoiceCapture(reason) {
         console.log(`[App] Voice cleanup: ${reason}`);
         if (silenceTimer) { clearTimeout(silenceTimer); silenceTimer = null; }
@@ -266,7 +266,7 @@ async function checkHealth() {
             const status = await statusRes.json();
 
             const modelName = status?.models?.llm?.name || 'runtime ready';
-            statusEl.textContent = `Aktif — ${String(modelName).split('/').pop()}`;
+            statusEl.textContent = `Aktif - ${String(modelName).split('/').pop()}`;
 
             // Sprint 3.5: Cache feature flags for voice mode decisions
             _cachedFeatures = status?.features || null;
@@ -277,7 +277,7 @@ async function checkHealth() {
                 dotEl.classList.remove('active');
             }
         } catch (statusError) {
-            statusEl.textContent = 'Backend active — runtime status unavailable';
+            statusEl.textContent = 'Backend active - runtime status unavailable';
             dotEl.classList.remove('active');
         }
     } catch (e) {
@@ -286,7 +286,7 @@ async function checkHealth() {
     }
 }
 
-// Sprint 7: Global active audio reference — prevents TTS/read-aloud conflicts
+// Sprint 7: Global active audio reference - prevents TTS/read-aloud conflicts
 let activeAudio = null;
 
 /**
@@ -296,7 +296,7 @@ let activeAudio = null;
  */
 function voxStopAudio() {
     if (activeAudio) {
-        activeAudio.onended = null; // nullify before pause — prevents stale callback
+        activeAudio.onended = null; // nullify before pause - prevents stale callback
         activeAudio.pause();
         activeAudio = null;
     }
@@ -309,7 +309,7 @@ function voxStopAudio() {
  */
 function resetTtsPlayback(queue) {
     if (Array.isArray(queue)) queue.length = 0;
-    // FVM queue is global — also clear it so next FVM activation starts clean
+    // FVM queue is global - also clear it so next FVM activation starts clean
     if (window._fvmTtsQueue) window._fvmTtsQueue.length = 0;
     window._fvmTtsPlaying = false;
 }

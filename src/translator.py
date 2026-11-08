@@ -1,7 +1,7 @@
 """
-VoxDesk — Translator Module
+VoxDesk - Translator Module
 MarianMT (Helsinki-NLP/opus-mt-tr-en) ile Türkçe → İngilizce çeviri.
-PyTorch float16 GPU inference — ~146 MB VRAM, <50ms latency.
+PyTorch float16 GPU inference - ~146 MB VRAM, <50ms latency.
 ManagedModel lifecycle entegrasyonu ile güvenli VRAM yönetimi.
 """
 
@@ -37,7 +37,7 @@ class Translator:
         self._model = None
         self._tokenizer = None
 
-        # Lifecycle — ManagedModel composition
+        # Lifecycle - ManagedModel composition
         self._lifecycle = _TranslatorLifecycle(
             owner=self,
             name="translator",
@@ -60,13 +60,13 @@ class Translator:
         if not self.enabled or not text.strip():
             return text
 
-        # İngilizce ise bypass — çeviriye gerek yok
+        # İngilizce ise bypass - çeviriye gerek yok
         if source_lang == "en":
             return text
 
         # Ref count guard
         if not self._lifecycle.acquire():
-            logger.error("Translator model hazır değil — bypass")
+            logger.error("Translator model hazır değil - bypass")
             return text
 
         try:
@@ -101,7 +101,7 @@ class Translator:
         return self._lifecycle.safe_unload()
 
     def close(self) -> None:
-        """Shutdown cleanup — model + tokenizer."""
+        """Shutdown cleanup - model + tokenizer."""
         self._lifecycle.close()
 
     def health(self) -> dict:
@@ -112,11 +112,11 @@ class Translator:
         return h
 
     def acquire(self) -> bool:
-        """Ref count artır — aktif kullanım başlıyor."""
+        """Ref count artır - aktif kullanım başlıyor."""
         return self._lifecycle.acquire()
 
     def release(self) -> None:
-        """Ref count azalt — aktif kullanım bitti."""
+        """Ref count azalt - aktif kullanım bitti."""
         self._lifecycle.release()
 
 
@@ -144,7 +144,7 @@ class _TranslatorLifecycle(ManagedModel):
         if self._owner.device == "cuda" and torch.cuda.is_available():
             model = model.half().cuda()
             vram_mb = torch.cuda.memory_allocated() / (1024 ** 2)
-            logger.info(f"✅ MarianMT yüklendi (CUDA float16) — {vram_mb:.0f} MB VRAM")
+            logger.info(f"✅ MarianMT yüklendi (CUDA float16) - {vram_mb:.0f} MB VRAM")
         else:
             logger.info("✅ MarianMT yüklendi (CPU)")
 

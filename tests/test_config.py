@@ -1,5 +1,5 @@
 """
-VoxDesk — Config Module Tests
+VoxDesk - Config Module Tests
 Pydantic model defaults, YAML loading, personality parsing, singleton lifecycle.
 Hardware/internet gerektirmez.
 """
@@ -134,7 +134,7 @@ class TestAppConfigNesting:
         assert cfg.host == "127.0.0.1"
 
     def test_nested_override(self):
-        """Alt-config override — capture interval."""
+        """Alt-config override - capture interval."""
         cfg = AppConfig(capture=CaptureConfig(interval_seconds=0.5))
         assert cfg.capture.interval_seconds == 0.5
         # Diğer alt-config'ler default kalmalı
@@ -165,7 +165,7 @@ class TestPersonalityLoading:
             encoding="utf-8",
         )
 
-        # load_personality PERSONALITIES_DIR kullanıyor — monkey-patch
+        # load_personality PERSONALITIES_DIR kullanıyor - monkey-patch
         import src.config as cfg_module
         original_dir = cfg_module.PERSONALITIES_DIR
         cfg_module.PERSONALITIES_DIR = tmp_path
@@ -249,7 +249,7 @@ class TestConfigLoading:
         assert c3 is c2
 
 
-# ── Sprint 1 — Config Mapping Tests ──────────────────────────
+# ── Sprint 1 - Config Mapping Tests ──────────────────────────
 
 class TestConfigMappingSprint1:
     """Sprint 1 Gap 5: load_config() maps all 6 previously-missing sections."""

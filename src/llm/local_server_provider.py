@@ -1,5 +1,5 @@
 """
-VoxDesk — LocalLlamaServerProvider
+VoxDesk - LocalLlamaServerProvider
 HTTP client for a locally-managed llama-server sidecar.
 
 Architecture:
@@ -32,7 +32,7 @@ from src.llm.history import ConversationHistory
 
 logger = logging.getLogger("voxdesk.llm.local_server")
 
-# Allowed hostnames — anything else is rejected
+# Allowed hostnames - anything else is rejected
 _LOCALHOST_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
 
 
@@ -166,7 +166,7 @@ class LocalLlamaServerProvider:
         logger.info(f"Personality changed: {personality.name}")
 
     def set_model(self, model_name: str) -> None:
-        logger.warning(f"set_model({model_name}) — hot-swap not available for local server")
+        logger.warning(f"set_model({model_name}) - hot-swap not available for local server")
 
     # ── Message Building ──
 
@@ -295,7 +295,7 @@ class LocalLlamaServerProvider:
             usage = data.get("usage", {})
             if usage:
                 logger.debug(
-                    f"LLM tokens — prompt: {usage.get('prompt_tokens')}, "
+                    f"LLM tokens - prompt: {usage.get('prompt_tokens')}, "
                     f"completion: {usage.get('completion_tokens')}, "
                     f"latency: {_elapsed_ms:.0f}ms"
                 )
@@ -431,5 +431,5 @@ class LocalLlamaServerProvider:
             self._client = None
 
     def unload(self) -> None:
-        """No-op for server provider — sidecar handles model lifecycle."""
+        """No-op for server provider - sidecar handles model lifecycle."""
         pass

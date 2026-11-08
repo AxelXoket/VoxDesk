@@ -1,5 +1,5 @@
 """
-VoxDesk — Sprint 6.1 Tests
+VoxDesk - Sprint 6.1 Tests
 Screen context policy unification, API honesty, dead code cleanup.
 """
 
@@ -21,7 +21,7 @@ class TestVoiceV2ScreenContext:
         source = Path("src/routes/voice_v2.py").read_text(encoding="utf-8")
         # Old pattern: image_bytes=None in LLM call should be gone
         assert "image_bytes=None" not in source, \
-            "voice_v2 still hardcodes image_bytes=None — screen context not unified"
+            "voice_v2 still hardcodes image_bytes=None - screen context not unified"
 
     @pytest.mark.regression
     def test_voice_v2_uses_get_best_frame(self):
@@ -52,7 +52,7 @@ class TestVoiceV2ScreenContext:
     def test_voice_v2_binary_and_legacy_both_have_screen(self):
         """Both _process_audio_buffer and _handle_legacy_audio must have screen context."""
         source = Path("src/routes/voice_v2.py").read_text(encoding="utf-8")
-        # Count occurrences of the pattern — should be at least 2 (binary + legacy)
+        # Count occurrences of the pattern - should be at least 2 (binary + legacy)
         count = source.count("voice_artifact = None")
         assert count >= 2, \
             f"Expected screen context in both paths, found {count} occurrences"
@@ -124,7 +124,7 @@ class TestGrabNowDxcamFirst:
 
 
 # ══════════════════════════════════════════════════════════════
-#  Frontend — No Manual Attachment Flow
+#  Frontend - No Manual Attachment Flow
 # ══════════════════════════════════════════════════════════════
 
 class TestFrontendScreenContextPolicy:
@@ -135,7 +135,7 @@ class TestFrontendScreenContextPolicy:
         """chat.js must not have this.attachments state."""
         source = Path("frontend/js/chat.js").read_text(encoding="utf-8")
         assert "this.attachments" not in source, \
-            "chat.js still has attachment state — manual flow not removed"
+            "chat.js still has attachment state - manual flow not removed"
 
     @pytest.mark.regression
     def test_chat_js_no_file_handling(self):

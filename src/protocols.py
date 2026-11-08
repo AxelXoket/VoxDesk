@@ -1,5 +1,5 @@
 """
-VoxDesk — Engine Protocols
+VoxDesk - Engine Protocols
 Structural typing contracts for all pluggable engine backends.
 Implementations satisfy these protocols implicitly (duck typing).
 
@@ -11,8 +11,8 @@ Protocol'ler mevcut engine class'larından türetilmiştir:
 
 Her Protocol'de:
   - Core methods (engine'in asıl işi)
-  - health() — monitoring için durum raporu
-  - close() / aclose() — resource cleanup
+  - health() - monitoring için durum raporu
+  - close() / aclose() - resource cleanup
 """
 
 from __future__ import annotations
@@ -62,7 +62,7 @@ class TTSEngine(Protocol):
 
     def synthesize_stream(self, text: str) -> Iterator[np.ndarray]:
         """
-        Streaming sentez — chunk chunk numpy array yield et.
+        Streaming sentez - chunk chunk numpy array yield et.
         Her chunk raw PCM float32 audio.
         """
         ...
@@ -104,7 +104,7 @@ class LLMProvider(Protocol):
         image_bytes: bytes | None = None,
         response_mode: str = "text",
     ) -> AsyncGenerator[str, None]:
-        """Async streaming chat — token token yield."""
+        """Async streaming chat - token token yield."""
         ...
 
     def get_history(self) -> list:

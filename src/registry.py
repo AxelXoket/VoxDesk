@@ -1,13 +1,13 @@
 """
-VoxDesk — Module Registry
+VoxDesk - Module Registry
 Dependency-injection factory catalog for pluggable engine backends.
-NOT a service locator — no global state, no runtime register/unregister.
+NOT a service locator - no global state, no runtime register/unregister.
 
 Lifecycle rules:
-  - register() at module import / app startup — builds the catalog
-  - create() at lifespan startup — instantiates engines ONCE
-  - Request path uses ready instances from app.state — NEVER calls create()
-  - After startup, registry is effectively immutable — no lock needed
+  - register() at module import / app startup - builds the catalog
+  - create() at lifespan startup - instantiates engines ONCE
+  - Request path uses ready instances from app.state - NEVER calls create()
+  - After startup, registry is effectively immutable - no lock needed
 
 Kind namespaces: stt/faster-whisper, tts/kokoro, llm/llama-cpp, capture/dxcam
 """
@@ -56,7 +56,7 @@ class ModuleRegistry:
             self._catalog[kind] = {}
 
         if name in self._catalog[kind]:
-            logger.warning(f"Registry: {kind}/{name} zaten kayıtlı — override ediliyor")
+            logger.warning(f"Registry: {kind}/{name} zaten kayıtlı - override ediliyor")
 
         self._catalog[kind][name] = {
             "factory": factory,

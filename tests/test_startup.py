@@ -1,5 +1,5 @@
 ﻿"""
-VoxDesk — Startup & Registry Integration Tests
+VoxDesk - Startup & Registry Integration Tests
 main.py startup refactor doğrulaması:
 - Factory'ler sadece startup'ta çağrılıyor mu?
 - Request path'te registry.create çağrılmıyor mu?
@@ -65,7 +65,7 @@ class TestStartupRegistration:
         registry = ModuleRegistry()
         _register_default_factories(registry)
 
-        # STT — factory'nin SpeechRecognizer döndürdüğünü doğrula
+        # STT - factory'nin SpeechRecognizer döndürdüğünü doğrula
         from src.stt import SpeechRecognizer
         stt_cfg = STTConfig()
         stt = registry.create("stt", "faster-whisper", stt_cfg)
@@ -117,7 +117,7 @@ class TestRequestPathSafety:
 
 
 # ══════════════════════════════════════════════════════════════
-#  Config Validation — Fail-Fast
+#  Config Validation - Fail-Fast
 # ══════════════════════════════════════════════════════════════
 
 class TestConfigFailFast:
@@ -175,8 +175,8 @@ class TestShutdownCleanup:
         # En az 4 bileşen için izole try/except olmalı
         try_count = source.count("try:")
         except_count = source.count("except Exception")
-        assert try_count >= 4, f"try bloğu {try_count} < 4 — izolasyon yetersiz"
-        assert except_count >= 4, f"except bloğu {except_count} < 4 — izolasyon yetersiz"
+        assert try_count >= 4, f"try bloğu {try_count} < 4 - izolasyon yetersiz"
+        assert except_count >= 4, f"except bloğu {except_count} < 4 - izolasyon yetersiz"
 
     @pytest.mark.unit
     def test_safe_shutdown_handles_none_state(self):
@@ -187,14 +187,14 @@ class TestShutdownCleanup:
 
         try:
             main_mod._state = None
-            # _safe_shutdown is async — run it properly
+            # _safe_shutdown is async - run it properly
             asyncio.run(main_mod._safe_shutdown())
         finally:
             main_mod._state = original_state
 
     @pytest.mark.unit
     def test_lifespan_source_has_raise(self):
-        """lifespan() startup hatası raise etmeli — sessizce yutmamalı."""
+        """lifespan() startup hatası raise etmeli - sessizce yutmamalı."""
         from src.main import lifespan
         source = inspect.getsource(lifespan)
         assert "raise" in source, "lifespan startup hatasını yutmamalı"

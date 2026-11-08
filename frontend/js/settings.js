@@ -1,5 +1,5 @@
 /**
- * VoxDesk — Settings Panel
+ * VoxDesk - Settings Panel
  * Model, ses, kişilik, history yönetimi.
  */
 

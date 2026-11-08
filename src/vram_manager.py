@@ -1,10 +1,10 @@
 """
-VoxDesk — VRAM Manager
+VoxDesk - VRAM Manager
 GPU bellek izleme ve model lifecycle koordinasyonu.
-torch.cuda.is_available() guard — GPU yoksa crash yok, safe report döner.
-Runtime model download YOK — local_files_only mantığı korunur.
+torch.cuda.is_available() guard - GPU yoksa crash yok, safe report döner.
+Runtime model download YOK - local_files_only mantığı korunur.
 
-Lives on app.state — NOT a singleton.
+Lives on app.state - NOT a singleton.
 Metrics entegrasyonu MetricsCollector üzerinden.
 """
 
@@ -23,7 +23,7 @@ logger = logging.getLogger("voxdesk.vram")
 
 
 def _cuda_available() -> bool:
-    """torch.cuda.is_available() — import failure'da False döner."""
+    """torch.cuda.is_available() - import failure'da False döner."""
     try:
         import torch
         return torch.cuda.is_available()
@@ -112,7 +112,7 @@ class VRAMManager:
         self._running = True
         self._monitor_task = asyncio.create_task(self._monitor_loop())
         logger.info(
-            f"VRAM monitor başlatıldı — "
+            f"VRAM monitor başlatıldı - "
             f"idle={self.idle_timeout_seconds}s, "
             f"poll={self.poll_interval_seconds}s"
         )
@@ -144,7 +144,7 @@ class VRAMManager:
                     models_snapshot = dict(self._models)
 
                 for name, model in models_snapshot.items():
-                    # Idle check — model bazlı veya global timeout
+                    # Idle check - model bazlı veya global timeout
                     timeout = self._model_timeouts.get(
                         name, self.idle_timeout_seconds
                     )
@@ -156,7 +156,7 @@ class VRAMManager:
                             if idle_secs >= timeout:
                                 logger.info(
                                     f"VRAM: {name} idle {idle_secs:.0f}s "
-                                    f"≥ {timeout}s — unload"
+                                    f"≥ {timeout}s - unload"
                                 )
                                 # run_in_executor: safe_unload may block on GPU cleanup
                                 loop = asyncio.get_running_loop()
@@ -187,7 +187,7 @@ class VRAMManager:
     # ── Reporting ────────────────────────────────────────────
 
     def get_report(self) -> dict:
-        """Tam VRAM raporu — model states + GPU stats."""
+        """Tam VRAM raporu - model states + GPU stats."""
         with self._lock:
             model_reports = {
                 name: model.health()
@@ -204,7 +204,7 @@ class VRAMManager:
     # ── Cleanup ──────────────────────────────────────────────
 
     def close(self) -> None:
-        """Tüm modelleri kapat — shutdown sırasında."""
+        """Tüm modelleri kapat - shutdown sırasında."""
         self._running = False
         with self._lock:
             for name, model in self._models.items():

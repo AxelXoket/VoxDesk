@@ -1,6 +1,6 @@
 /**
- * VoxDesk — Developer HUD
- * Minimal overlay — WS durumları, model durumları, son hata.
+ * VoxDesk - Developer HUD
+ * Minimal overlay - WS durumları, model durumları, son hata.
  * Toggle: Ctrl+Shift+D
  */
 
@@ -54,19 +54,19 @@ class DevHud {
 
         // Server-side status
         let apiState = '❌ DOWN';
-        let sttState = '—';
-        let llmState = '—';
-        let ttsState = '—';
-        let lastError = '—';
+        let sttState = '-';
+        let llmState = '-';
+        let ttsState = '-';
+        let lastError = '-';
 
         try {
             const res = await fetch('/api/status');
             if (res.ok) {
                 const data = await res.json();
                 apiState = data.api?.status === 'ok' ? '✅ OK' : '⚠️ ' + (data.api?.status || 'unknown');
-                sttState = data.models?.stt?.state || '—';
-                llmState = data.models?.llm?.state || '—';
-                ttsState = data.models?.tts?.state || '—';
+                sttState = data.models?.stt?.state || '-';
+                llmState = data.models?.llm?.state || '-';
+                ttsState = data.models?.tts?.state || '-';
                 if (data.last_error) {
                     lastError = data.last_error.substring(0, 60);
                 }

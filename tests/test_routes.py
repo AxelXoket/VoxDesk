@@ -1,7 +1,7 @@
 """
-VoxDesk — Route & API Contract Tests
+VoxDesk - Route & API Contract Tests
 FastAPI endpoint modelleri, request/response formatları, audio decode, WS contracts.
-Sunucu başlatmadan — sadece model ve helper doğrulaması.
+Sunucu başlatmadan - sadece model ve helper doğrulaması.
 """
 
 import pytest
@@ -273,7 +273,7 @@ class TestSettingsModels:
 
 
 # ══════════════════════════════════════════════════════════════
-#  Sprint 1 — /api/health and /api/status Contract Tests
+#  Sprint 1 - /api/health and /api/status Contract Tests
 # ══════════════════════════════════════════════════════════════
 
 class TestHealthStatusEndpoints:
@@ -381,7 +381,7 @@ class TestDebugMetricsFlag:
 
 
 # ══════════════════════════════════════════════════════════════
-#  Sprint 1 — WebSocket Origin Validation Tests
+#  Sprint 1 - WebSocket Origin Validation Tests
 # ══════════════════════════════════════════════════════════════
 
 class TestCheckOrigin:
@@ -429,7 +429,7 @@ class TestCheckOrigin:
 
 
 # ══════════════════════════════════════════════════════════════
-#  Sprint 1 — VRAM Feature Flag Tests
+#  Sprint 1 - VRAM Feature Flag Tests
 # ══════════════════════════════════════════════════════════════
 
 class TestVRAMFeatureFlag:

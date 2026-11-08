@@ -1,5 +1,5 @@
 """
-VoxDesk — Model State Machine
+VoxDesk - Model State Machine
 STT/TTS gibi GPU-bound modellerin güvenli lifecycle yönetimi.
 
 Tek otorite: self._lock
@@ -54,7 +54,7 @@ _VALID_TRANSITIONS: dict[ModelState, set[ModelState]] = {
 
 class ManagedModel:
     """
-    GPU model lifecycle manager — ref-counted state machine.
+    GPU model lifecycle manager - ref-counted state machine.
 
     Subclass'lar _do_load() ve _do_unload() implemente eder.
     Bu class state/lock/ref_count yönetir, model I/O yapmaz.
@@ -74,13 +74,13 @@ class ManagedModel:
         self.unload_cooldown_seconds = unload_cooldown_seconds
         self.keep_warm = keep_warm
 
-        # Single lock — tek otorite
+        # Single lock - tek otorite
         self._lock = threading.Lock()
         # Event for load-wait coordination (set when not loading)
         self._load_event = threading.Event()
         self._load_event.set()  # Initially not loading
 
-        # Protected state — sadece _lock altında mutate
+        # Protected state - sadece _lock altında mutate
         self._state = ModelState.UNLOADED
         self._ref_count: int = 0
         self._loaded_at: float | None = None
@@ -116,7 +116,7 @@ class ManagedModel:
 
     def _transition(self, new_state: ModelState) -> bool:
         """
-        State transition — lock ALTINDA çağrılmalı (internal use).
+        State transition - lock ALTINDA çağrılmalı (internal use).
         Returns True if transition is valid, False otherwise.
         """
         valid = _VALID_TRANSITIONS.get(self._state, set())
@@ -144,14 +144,14 @@ class ManagedModel:
         should_load = False
 
         with self._lock:
-            # Zaten yüklü — duplicate load protection
+            # Zaten yüklü - duplicate load protection
             if self._state in (ModelState.LOADED, ModelState.IN_USE):
-                logger.debug(f"[{self.name}] zaten yüklü — skip")
+                logger.debug(f"[{self.name}] zaten yüklü - skip")
                 return True
 
             # Loading durumunda: bekle
             if self._state == ModelState.LOADING:
-                logger.debug(f"[{self.name}] zaten yükleniyor — bekleniyor")
+                logger.debug(f"[{self.name}] zaten yükleniyor - bekleniyor")
                 should_wait = True
 
             elif not self._transition(ModelState.LOADING):
@@ -161,7 +161,7 @@ class ManagedModel:
                 self._load_event.clear()
                 should_load = True
 
-        # Lock DIŞINDA — I/O blocking
+        # Lock DIŞINDA - I/O blocking
         if should_load:
             try:
                 model = self._do_load()
@@ -182,13 +182,13 @@ class ManagedModel:
                 self._load_event.set()  # Bekleyenleri uyandır
 
         if should_wait:
-            # LOADING state'e geldik ama sahip biz değiliz — bekle
+            # LOADING state'e geldik ama sahip biz değiliz - bekle
             logger.debug(f"[{self.name}] mevcut load işlemi bekleniyor...")
             self._load_event.wait(timeout=120.0)  # Max 2 dakika bekle
 
             with self._lock:
                 if self._state in (ModelState.LOADED, ModelState.IN_USE):
-                    logger.debug(f"[{self.name}] bekleme sonrası yüklü — OK")
+                    logger.debug(f"[{self.name}] bekleme sonrası yüklü - OK")
                     return True
                 logger.warning(f"[{self.name}] bekleme sonrası state: {self._state.value}")
                 return False
@@ -217,7 +217,7 @@ class ManagedModel:
             if self._state not in (ModelState.LOADED, ModelState.IN_USE):
                 return False
 
-            # REF COUNT GUARD — en kritik kural
+            # REF COUNT GUARD - en kritik kural
             if self._ref_count > 0:
                 logger.debug(
                     f"[{self.name}] unload reddedildi: "
@@ -277,7 +277,7 @@ class ManagedModel:
 
     def acquire(self) -> bool:
         """
-        Ref count artır — aktif kullanım başlıyor.
+        Ref count artır - aktif kullanım başlıyor.
         Model loaded değilse otomatik load dener.
         Returns True if model is ready to use.
         """
@@ -303,7 +303,7 @@ class ManagedModel:
         return False
 
     def release(self) -> None:
-        """Ref count azalt — aktif kullanım bitti."""
+        """Ref count azalt - aktif kullanım bitti."""
         with self._lock:
             if self._ref_count > 0:
                 self._ref_count -= 1
@@ -331,7 +331,7 @@ class ManagedModel:
     # ── Close ────────────────────────────────────────────────
 
     def close(self) -> None:
-        """Force cleanup — shutdown sırasında."""
+        """Force cleanup - shutdown sırasında."""
         with self._lock:
             self._ref_count = 0  # Force clear
         try:

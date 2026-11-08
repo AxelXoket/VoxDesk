@@ -1,5 +1,5 @@
 """
-VoxDesk — Audio Binary Protocol v1
+VoxDesk - Audio Binary Protocol v1
 WebSocket üzerinden PCM audio transfer protokolü.
 
 v1 özellikleri:
@@ -13,8 +13,8 @@ v1 özellikleri:
 Güvenlik:
 - max_frame_bytes ile oversized frame koruması
 - even byte count doğrulaması (16-bit alignment)
-- handshake zorunlu — binary before handshake reject
-- Tüm iletişim localhost — dış domain yok
+- handshake zorunlu - binary before handshake reject
+- Tüm iletişim localhost - dış domain yok
 """
 
 from __future__ import annotations
@@ -43,9 +43,9 @@ BYTES_PER_SAMPLE = 2  # 16-bit = 2 bytes
 SAMPLES_PER_CHUNK = int(SAMPLE_RATE * CHUNK_MS / 1000)  # 320
 BYTES_PER_CHUNK = SAMPLES_PER_CHUNK * BYTES_PER_SAMPLE   # 640
 
-# Limits — backed by SecurityConfig (see src/config.py)
+# Limits - backed by SecurityConfig (see src/config.py)
 def _get_security_config():
-    """Lazy config read — avoids import cycle."""
+    """Lazy config read - avoids import cycle."""
     try:
         from src.config import get_config
         return get_config().security
@@ -62,8 +62,8 @@ def get_max_json_message_bytes() -> int:
     sec = _get_security_config()
     return sec.max_json_message_bytes if sec else 64 * 1024
 
-MAX_FRAME_BYTES = 64 * 1024      # 64KB — fallback default (config overrides at runtime)
-MAX_BASE64_BYTES = 256 * 1024    # 256KB — legacy base64 limit
+MAX_FRAME_BYTES = 64 * 1024      # 64KB - fallback default (config overrides at runtime)
+MAX_BASE64_BYTES = 256 * 1024    # 256KB - legacy base64 limit
 MIN_FRAME_BYTES = 2              # At least 1 sample
 
 
@@ -151,7 +151,7 @@ def validate_binary_frame(data: bytes) -> tuple[bool, str | None]:
         return False, f"Frame çok büyük: {len(data)} bytes (max: {max_bytes})"
 
     if len(data) % BYTES_PER_SAMPLE != 0:
-        return False, f"Tek byte sayısı: {len(data)} — 16-bit alignment gerekli"
+        return False, f"Tek byte sayısı: {len(data)} - 16-bit alignment gerekli"
 
     return True, None
 

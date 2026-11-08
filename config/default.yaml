@@ -1,4 +1,4 @@
-# VoxDesk — Default Configuration
+# VoxDesk - Default Configuration
 app:
   name: "VoxDesk"
   host: "127.0.0.1"
@@ -6,17 +6,17 @@ app:
   debug: false
 
 capture:
-  backend: "dxcam"           # dxcam — Windows DirectX screen capture
+  backend: "dxcam"           # dxcam - Windows DirectX screen capture
   interval_seconds: 1.0
   buffer_size: 30        # Last 30 frames (ring buffer)
   jpeg_quality: 85          # Legacy default (preview fallback)
   resize_width: 1280        # Legacy default (preview fallback)
 
-  # Part 3: Preview path — screen websocket / frontend preview
+  # Part 3: Preview path - screen websocket / frontend preview
   preview_resize_width: 1280
   preview_jpeg_quality: 85
 
-  # Part 3: Inference path — LLM image input (matches upload 1920/Q92)
+  # Part 3: Inference path - LLM image input (matches upload 1920/Q92)
   inference_resize_width: 1920
   inference_jpeg_quality: 92
 
@@ -37,7 +37,7 @@ llm:
 # ── Local llama-server sidecar (Gemma4 vision via HTTP) ──────────
 local_llama_server:
   enabled: true
-  executable_path: ""  # REQUIRED — set to local llama-server.exe path before starting
+  executable_path: ""  # REQUIRED - set to local llama-server.exe path before starting
   # Dev example:  "C:/Users/USER/.docker/bin/inference/llama-server.exe"
   # EXE packaging: bundled llama-server.exe next to VoxDesk.exe
   #   VoxDesk.exe
@@ -69,7 +69,7 @@ tts:
 stt:
   engine: "faster-whisper"
   model: "large-v3-turbo"
-  model_path: "models/whisper-large-v3-turbo"   # CTranslate2 format — lokal, faster-whisper uyumlu
+  model_path: "models/whisper-large-v3-turbo"   # CTranslate2 format - lokal, faster-whisper uyumlu
   device: "cuda"
   compute_type: "float16"
   language: null          # null = auto-detect TR/EN
@@ -79,7 +79,7 @@ translator:
   engine: "marian"
   model_path: "models/opus-mt-tr-en"
   device: "cuda"
-  enabled: false          # LLM handles multilingual natively — translator dormant
+  enabled: false          # LLM handles multilingual natively - translator dormant
 
 voice_activation:
   enabled: false
@@ -98,7 +98,7 @@ history:
   auto_save: false        # Enable manually if needed
   save_path: "./data/history/"
 
-# Sprint 1 — Gap 5: Previously unmapped sections (now loaded by load_config)
+# Sprint 1 - Gap 5: Previously unmapped sections (now loaded by load_config)
 
 features:
   enable_module_registry: true

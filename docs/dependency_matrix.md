@@ -1,4 +1,4 @@
-# VoxDesk — Dependency Compatibility Matrix
+# VoxDesk - Dependency Compatibility Matrix
 
 > Sprint 5.3 donanım doğrulaması tamamlanmış bağımlılık tablosu.
 > RTX 5080 = Blackwell mimarisi (SM 12.0, compute capability 12.0).
@@ -10,20 +10,20 @@
 
 | Package | Required | Installed | CUDA? | Status | Notes |
 |:--------|:---------|:----------|:------|:-------|:------|
-| Python | 3.12.x | 3.12.10 | — | ✅ | |
-| NVIDIA Driver | ≥570 | Güncel | — | ✅ | Blackwell destekli |
+| Python | 3.12.x | 3.12.10 | - | ✅ | |
+| NVIDIA Driver | ≥570 | Güncel | - | ✅ | Blackwell destekli |
 | CUDA Toolkit | 12.8 | 12.8.61 | ✅ | ✅ | SM 12.0 (Blackwell) |
 | PyTorch | ≥2.7 | 2.11.0+cu128 | ✅ | ✅ | |
 | torchaudio | matching | eşleşmiş | ✅ | ✅ | Kokoro TTS backend |
 | CTranslate2 | latest | 4.7.1 | ✅ | ✅ | faster-whisper backend |
 | faster-whisper | ≥1.1 | güncel | ✅ | ✅ | large-v3-turbo model |
 | kokoro | latest | güncel | ✅ | ✅ | TTS engine |
-| dxcam | ≥0.3 | güncel | — | ✅ | Windows screen capture |
+| dxcam | ≥0.3 | güncel | - | ✅ | Windows screen capture |
 | llama-cpp-python | latest | 0.3.21 | ✅ | ✅ | CUDA 12.8, SM 120 build |
-| transformers | ≥4.40 | güncel | — | ✅ | MarianMT backend |
-| sentencepiece | ≥0.2 | güncel | — | ✅ | MarianMT tokenizer |
-| sacremoses | ≥2.1 | güncel | — | ✅ | MarianMT tokenizer util |
-| espeak-ng | 1.52.0 | 1.52.0 | — | ✅ | System MSI — Kokoro phonemizer |
+| transformers | ≥4.40 | güncel | - | ✅ | MarianMT backend |
+| sentencepiece | ≥0.2 | güncel | - | ✅ | MarianMT tokenizer |
+| sacremoses | ≥2.1 | güncel | - | ✅ | MarianMT tokenizer util |
+| espeak-ng | 1.52.0 | 1.52.0 | - | ✅ | System MSI - Kokoro phonemizer |
 
 ## Model Files
 
@@ -32,10 +32,10 @@
 | **Gemma-4 E4B Uncensored** (default) | Q8_K_P | 7.76 GB | `models/gemma-4-E4B-uncensored/Gemma-4-E4B-Uncensored-HauhauCS-Aggressive-Q8_K_P.gguf` | ✅ ⚠️ |
 | Gemma-4 E4B Uncensored mmproj | F16 | 944 MB | `models/gemma-4-E4B-uncensored/mmproj-Gemma-4-E4B-Uncensored-HauhauCS-Aggressive-f16.gguf` | ✅ ⚠️ |
 | Gemma-4 E4B Official | Q8_0 | ~4.5 GB | `models/gemma-4-E4B-official/gemma-4-E4B-it-Q8_0.gguf` | ✅ ⚠️ |
-| Gemma-4 E4B Official mmproj | BF16 | — | `models/gemma-4-E4B-official/mmproj-gemma-4-E4B-it-bf16.gguf` | ✅ ⚠️ |
+| Gemma-4 E4B Official mmproj | BF16 | - | `models/gemma-4-E4B-official/mmproj-gemma-4-E4B-it-bf16.gguf` | ✅ ⚠️ |
 | MiniCPM-V 4.5 Official | Q6_K | 6.26 GB | `models/minicpm-v4.5-official/model-q6_k.gguf` | ✅ |
 | MiniCPM-V 4.5 mmproj | F16 | 1.02 GB | `models/minicpm-v4.5-official/mmproj-f16.gguf` | ✅ |
-| MiniCPM-V 4.5 Abliterated | Q6_K | — | `models/minicpm-v4.5-abliterated/` | ⏳ Onay bekleniyor |
+| MiniCPM-V 4.5 Abliterated | Q6_K | - | `models/minicpm-v4.5-abliterated/` | ⏳ Onay bekleniyor |
 | Qwen2.5-VL-7B-Instruct | Q8_0 | 7.72 GB | `models/Qwen2.5-VL-7B/Qwen_Qwen2.5-VL-7B-Instruct-Q8_0.gguf` | ✅ |
 | Qwen2.5-VL-7B mmproj | F16 | 1.29 GB | `models/Qwen2.5-VL-7B/mmproj-Qwen_Qwen2.5-VL-7B-Instruct-f16.gguf` | ✅ |
 | Qwen3-VL-8B-Instruct | Q8_0 | ~8.5 GB | `models/qwen3-vl-8b-instruct/` | ⏳ İndirilmedi |
@@ -44,21 +44,21 @@
 | Whisper large-v3-turbo | CTranslate2 FP16 | ~1.5 GB | `models/whisper-large-v3-turbo/` | ✅ |
 
 > **⚠️ Gemma4 Vision Limitation:** `llama-cpp-python 0.3.21` does NOT include a
-> `Gemma4ChatHandler`. The mmproj file is present but vision input is not wired — the model
+> `Gemma4ChatHandler`. The mmproj file is present but vision input is not wired - the model
 > runs as text-only. Qwen2.5-VL (fallback) has full vision support via `Qwen25VLChatHandler`.
 > Gemma4 vision requires either a newer llama-cpp-python release or a custom handler.
 
-## VRAM Budget (RTX 5080 — 16 GB)
+## VRAM Budget (RTX 5080 - 16 GB)
 
 | Component | Estimated VRAM | Measured | Idle Unload | Notes |
 |:----------|:---------------|:---------|:------------|:------|
-| LLM (Q6_K, full offload) | ~7 GB | — | ❌ Always warm | n_gpu_layers=-1 |
-| mmproj (F16) | ~1.1 GB | — | ❌ With LLM | Vision encoder |
-| STT (large-v3-turbo) | ~3 GB | — | ✅ 3 min | CTranslate2 |
-| TTS (Kokoro) | ~2 GB | — | ✅ 3 min | |
+| LLM (Q6_K, full offload) | ~7 GB | - | ❌ Always warm | n_gpu_layers=-1 |
+| mmproj (F16) | ~1.1 GB | - | ❌ With LLM | Vision encoder |
+| STT (large-v3-turbo) | ~3 GB | - | ✅ 3 min | CTranslate2 |
+| TTS (Kokoro) | ~2 GB | - | ✅ 3 min | |
 | Translator (MarianMT) | ~600 MB | **146 MB** | ✅ 3 min | PyTorch float16 |
 | **Active total** | **~12.1 GB** | | | 76% of 16 GB |
-| **Idle total** | **~7 GB** | | | 44% — LLM only |
+| **Idle total** | **~7 GB** | | | 44% - LLM only |
 
 ## Verified Smoke Commands
 

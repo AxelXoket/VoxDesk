@@ -1,5 +1,5 @@
 /**
- * VoxDesk — Full Voice Mode
+ * VoxDesk - Full Voice Mode
  * Sprint 7 : Dedicated voice-only conversation mode.
  *
  * State machine : idle → listening → user_speaking → silence_countdown
@@ -67,7 +67,7 @@ class FullVoiceMode {
         // Audio
         this._audioCapture = null;
 
-        // Waveform bars — created once
+        // Waveform bars - created once
         this._bars = [];
 
         this._init();
@@ -200,7 +200,7 @@ class FullVoiceMode {
         const useBinary = true; // FVM always uses binary/worklet path
         this._audioCapture = new AudioCapture(transport, { useBinary });
 
-        // RMS callback — silence detection + waveform
+        // RMS callback - silence detection + waveform
         this._audioCapture.onLevelUpdate = (rms) => this._onRmsUpdate(rms);
 
         try {
@@ -278,16 +278,16 @@ class FullVoiceMode {
         // Play beep to signal turn end
         this._playBeep();
 
-        // Stop recording — this sends audio_end to backend
+        // Stop recording - this sends audio_end to backend
         this._stopListening();
 
         this._setState(FVM_STATES.PROCESSING);
 
-        // Sprint 7.2: Hard processing timeout — if nothing arrives, recover
+        // Sprint 7.2: Hard processing timeout - if nothing arrives, recover
         this._clearProcessingTimer();
         this._processingTimer = setTimeout(() => {
             if (this._isActive && this._state === FVM_STATES.PROCESSING) {
-                console.warn('[FVM] Processing timeout — recovering');
+                console.warn('[FVM] Processing timeout - recovering');
                 this._handleError('İşlem zaman aşımına uğradı');
             }
         }, FVM_PROCESSING_TIMEOUT_MS);
@@ -309,7 +309,7 @@ class FullVoiceMode {
                 break;
 
             case 'stt_empty':
-                // No speech detected — go back to listening
+                // No speech detected - go back to listening
                 this._clearProcessingTimer();
                 this._clearLlmTtsGraceTimer();
                 if (this._state === FVM_STATES.PROCESSING) {
@@ -319,13 +319,13 @@ class FullVoiceMode {
 
             case 'llm_response':
                 window.VoxChat.addMessage('assistant', data.text);
-                // Sprint 7.2: Start grace timer — if no tts_audio within
+                // Sprint 7.2: Start grace timer - if no tts_audio within
                 // FVM_LLM_TTS_GRACE_MS, return to listening (TTS may be
                 // disabled, unavailable, or backend chose not to send audio).
                 this._clearLlmTtsGraceTimer();
                 this._llmTtsGraceTimer = setTimeout(() => {
                     if (this._isActive && this._state === FVM_STATES.PROCESSING) {
-                        console.info('[FVM] No TTS audio after LLM response — returning to listening');
+                        console.info('[FVM] No TTS audio after LLM response - returning to listening');
                         this._clearProcessingTimer();
                         this._restartListening();
                     }
@@ -333,11 +333,11 @@ class FullVoiceMode {
                 break;
 
             case 'tts_audio':
-                // Sprint 7.2: TTS arrived — cancel grace + processing timers
+                // Sprint 7.2: TTS arrived - cancel grace + processing timers
                 this._clearProcessingTimer();
                 this._clearLlmTtsGraceTimer();
                 this._setState(FVM_STATES.AI_SPEAKING);
-                // Queue through global TTS queue — uses shared playAudio()
+                // Queue through global TTS queue - uses shared playAudio()
                 if (window._fvmTtsQueue) {
                     window._fvmTtsQueue.push(data.audio);
                     if (!window._fvmTtsPlaying) this._playNextFvmTts();
@@ -364,7 +364,7 @@ class FullVoiceMode {
     _playNextFvmTts() {
         if (!window._fvmTtsQueue || window._fvmTtsQueue.length === 0) {
             window._fvmTtsPlaying = false;
-            // TTS finished — return to listening
+            // TTS finished - return to listening
             if (this._isActive && this._state === FVM_STATES.AI_SPEAKING) {
                 this._restartListening();
             }
@@ -374,7 +374,7 @@ class FullVoiceMode {
         window._fvmTtsPlaying = true;
         const b64 = window._fvmTtsQueue.shift();
 
-        // Use shared playAudio — handles activeAudio conflict management
+        // Use shared playAudio - handles activeAudio conflict management
         if (typeof window.playAudioFromBase64 === 'function') {
             window.playAudioFromBase64(b64, () => this._playNextFvmTts());
         }
@@ -458,7 +458,7 @@ class FullVoiceMode {
         const center = (FVM_BAR_COUNT - 1) / 2;
 
         for (let i = 0; i < this._bars.length; i++) {
-            // Sinusoidal modulation — center bars taller
+            // Sinusoidal modulation - center bars taller
             const distFromCenter = Math.abs(i - center) / center;
             const sinMod = Math.cos(distFromCenter * Math.PI * 0.5);
 
@@ -504,7 +504,7 @@ class FullVoiceMode {
     }
 }
 
-// Global init — will be wired by app.js
+// Global init - will be wired by app.js
 if (typeof window !== 'undefined') {
     window.FullVoiceMode = FullVoiceMode;
     // FVM TTS queue (separate from dictation TTS queue)

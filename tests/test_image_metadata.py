@@ -1,5 +1,5 @@
 """
-VoxDesk — Sprint 5.3 Part 1.5 Tests
+VoxDesk - Sprint 5.3 Part 1.5 Tests
 Image metadata, debug export, capture metadata tracking.
 """
 
@@ -23,7 +23,7 @@ from src.image_metadata import (
 
 # ── Helper: minimal JPEG bytes ──────────────────────────────────
 def _make_jpeg(width: int = 100, height: int = 50, quality: int = 85) -> bytes:
-    """PIL ile minimal JPEG üret — test fixture."""
+    """PIL ile minimal JPEG üret - test fixture."""
     from PIL import Image
     import io
 
@@ -108,7 +108,7 @@ class TestBuildImageMetadata:
         assert meta.age_ms > 900  # en az 1 saniye geçmiş olmalı
 
     def test_metadata_is_frozen(self):
-        """ImageMetadata frozen=True — mutate edilemez."""
+        """ImageMetadata frozen=True - mutate edilemez."""
         jpeg = _make_jpeg()
         meta = build_image_metadata(source="upload", image_bytes=jpeg)
         with pytest.raises(AttributeError):
@@ -123,7 +123,7 @@ class TestBuildImageMetadata:
             image_bytes=jpeg,
             jpeg_quality=92,
         )
-        # Bytes aynı kalmalı — recompress yok
+        # Bytes aynı kalmalı - recompress yok
         after_hash = hashlib.sha256(jpeg).hexdigest()
         assert original_hash == after_hash
         assert meta.byte_size == len(jpeg)
@@ -167,9 +167,9 @@ class TestDebugExport:
     """Debug frame export flag-gated tests."""
 
     def test_export_disabled_no_file(self):
-        """Default kapalı — dosya yazılmamalı."""
+        """Default kapalı - dosya yazılmamalı."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            # export_debug_frame'i çağırmıyoruz — sadece flag kapalıyken
+            # export_debug_frame'i çağırmıyoruz - sadece flag kapalıyken
             # caller'ın çağırmadığını simüle ediyoruz
             export_path = os.path.join(tmpdir, "debug_frames")
             assert not os.path.exists(export_path)
@@ -219,7 +219,7 @@ class TestCapturedFrameMetadata:
     """CapturedFrame original/normalized resolution tracking."""
 
     def test_backward_compat_minimal(self):
-        """Eski kullanım şekli hâlâ çalışmalı — sadece image_bytes ve timestamp."""
+        """Eski kullanım şekli hâlâ çalışmalı - sadece image_bytes ve timestamp."""
         from src.capture import CapturedFrame
 
         frame = CapturedFrame(
@@ -264,7 +264,7 @@ class TestCapturedFrameMetadata:
 # ── Upload Metadata Tests ───────────────────────────────────────
 
 class TestUploadMetadata:
-    """Upload image metadata generation — no recompress."""
+    """Upload image metadata generation - no recompress."""
 
     def test_upload_metadata_from_jpeg(self):
         jpeg = _make_jpeg(1920, 1080, quality=92)

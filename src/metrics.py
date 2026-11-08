@@ -1,7 +1,7 @@
 """
-VoxDesk — Metrics Collector
+VoxDesk - Metrics Collector
 Sliding-window percentile collector + monotonic counters + gauges.
-Lives on app.state.metrics — NOT a global singleton.
+Lives on app.state.metrics - NOT a global singleton.
 Thread-safe via threading.Lock (single uvicorn worker assumption).
 
 Metrics are process-local.
@@ -19,7 +19,7 @@ from typing import Generator
 
 @dataclass
 class _SlidingWindow:
-    """Sliding-window percentile collector — son N ölçüm üzerinden p50/p95/p99."""
+    """Sliding-window percentile collector - son N ölçüm üzerinden p50/p95/p99."""
     values: deque = field(default_factory=lambda: deque(maxlen=500))
 
     def add(self, value: float) -> None:
@@ -54,21 +54,21 @@ class MetricsCollector:
     - VRAM: torch-based (process-local, NOT nvidia-smi)
 
     Thread-safe via single threading.Lock.
-    Single uvicorn worker assumed — multi-worker requires Prometheus (P2).
+    Single uvicorn worker assumed - multi-worker requires Prometheus (P2).
     """
 
     def __init__(self, window_size: int = 500):
         self._lock = threading.Lock()
         self._start_time = time.monotonic()
 
-        # Latency — sliding-window percentile collectors
+        # Latency - sliding-window percentile collectors
         self._latency: dict[str, _SlidingWindow] = {
             "llm_latency_ms": _SlidingWindow(deque(maxlen=window_size)),
             "stt_decode_ms": _SlidingWindow(deque(maxlen=window_size)),
             "tts_synthesis_ms": _SlidingWindow(deque(maxlen=window_size)),
         }
 
-        # Error counters — monotonic
+        # Error counters - monotonic
         self._counters: dict[str, int] = {
             "llm_errors_total": 0,
             "stt_errors_total": 0,
@@ -76,14 +76,14 @@ class MetricsCollector:
             "ws_disconnects_total": 0,
         }
 
-        # Saturation gauges — point-in-time
+        # Saturation gauges - point-in-time
         self._gauges: dict[str, float] = {
             "active_stt_requests": 0,
             "active_tts_requests": 0,
             "audio_queue_depth": 0,
         }
 
-        # Boolean flags — Sprint 8.1: Pre-register all model-loaded flags
+        # Boolean flags - Sprint 8.1: Pre-register all model-loaded flags
         self._flags: dict[str, bool] = {
             "model_loaded_stt": False,
             "model_loaded_tts": False,
@@ -101,7 +101,7 @@ class MetricsCollector:
 
     @contextmanager
     def measure(self, name: str) -> Generator[None, None, None]:
-        """Context manager — auto-records elapsed time in ms."""
+        """Context manager - auto-records elapsed time in ms."""
         start = time.perf_counter()
         try:
             yield
@@ -171,7 +171,7 @@ class MetricsCollector:
     def get_vram_report(self) -> dict:
         """
         PyTorch CUDA memory report (process-local allocator metrics).
-        NOT nvidia-smi — these are different measurements.
+        NOT nvidia-smi - these are different measurements.
         Returns empty dict if CUDA is unavailable.
         """
         try:
@@ -204,7 +204,7 @@ class MetricsCollector:
 
     def reset_for_tests(self) -> None:
         """
-        Reset all metrics — test-only, NOT for production use.
+        Reset all metrics - test-only, NOT for production use.
         Clears all counters, gauges, flags, and latency windows.
         """
         with self._lock:

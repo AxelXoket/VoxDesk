@@ -1,5 +1,5 @@
 """
-VoxDesk — History API Routes
+VoxDesk - History API Routes
 Konuşma geçmişi yönetimi, export desteği.
 """
 

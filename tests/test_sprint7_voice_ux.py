@@ -1,5 +1,5 @@
 """
-VoxDesk — Sprint 7 Voice UX Tests
+VoxDesk - Sprint 7 Voice UX Tests
 Full Voice Mode, read-aloud endpoint, AudioWorklet RMS, silence detection.
 Baseline : 623 passed, 3 xfailed → yeni testler eklenir, mevcut kırılmaz.
 """
@@ -19,7 +19,7 @@ FRONTEND_CSS = FRONTEND / "css"
 
 
 # ═══════════════════════════════════════════════════════════════
-#  FAZ 1 — Backend : /api/tts/read endpoint + feature flag
+#  FAZ 1 - Backend : /api/tts/read endpoint + feature flag
 # ═══════════════════════════════════════════════════════════════
 
 class TestTTSReadEndpoint:
@@ -106,7 +106,7 @@ class TestFeatureFlag:
 
 
 # ═══════════════════════════════════════════════════════════════
-#  FAZ 2 — AudioWorklet RMS
+#  FAZ 2 - AudioWorklet RMS
 # ═══════════════════════════════════════════════════════════════
 
 class TestAudioWorkletRMS:
@@ -136,7 +136,7 @@ class TestAudioWorkletRMS:
 
 
 # ═══════════════════════════════════════════════════════════════
-#  FAZ 3 — Full Voice Mode JS
+#  FAZ 3 - Full Voice Mode JS
 # ═══════════════════════════════════════════════════════════════
 
 class TestFullVoiceModeJS:
@@ -213,7 +213,7 @@ class TestFullVoiceModeJS:
 
 
 # ═══════════════════════════════════════════════════════════════
-#  FAZ 4 — HTML + CSS
+#  FAZ 4 - HTML + CSS
 # ═══════════════════════════════════════════════════════════════
 
 class TestHTMLStructure:
@@ -274,7 +274,7 @@ class TestPreservedElements:
 
 
 # ═══════════════════════════════════════════════════════════════
-#  FAZ 5 — Chat Read-Aloud + App.js Integration
+#  FAZ 5 - Chat Read-Aloud + App.js Integration
 # ═══════════════════════════════════════════════════════════════
 
 class TestReadAloudButton:
@@ -363,7 +363,7 @@ class TestScreenContextPolicy:
 
 
 # ═══════════════════════════════════════════════════════════════
-#  Sprint 7.1 — Stabilization Tests
+#  Sprint 7.1 - Stabilization Tests
 # ═══════════════════════════════════════════════════════════════
 
 class TestSprint71Stabilization:
@@ -478,7 +478,7 @@ class TestSprint71Stabilization:
         """readAloud handler should call voxStopAudio() before starting new audio."""
         app_file = FRONTEND_JS / "app.js"
         content = app_file.read_text(encoding="utf-8")
-        # Search the entire file — voxStopAudio() is called inside the handler
+        # Search the entire file - voxStopAudio() is called inside the handler
         assert "voxStopAudio()" in content, \
             "app.js does not contain any voxStopAudio() call"
         # Confirm it appears after the readAloud event registration
@@ -659,7 +659,7 @@ class TestSprint72Stabilization:
 class TestSprint72bStateTruthfulness:
     """Screen toggle, voice toggle cleanup, label fixes, Gemma4 limitation."""
 
-    # ── Screen capture toggle — backend ────────────────────
+    # ── Screen capture toggle - backend ────────────────────
 
     @pytest.mark.regression
     def test_screen_toggle_endpoint_exists(self):

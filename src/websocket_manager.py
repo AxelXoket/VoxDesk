@@ -1,5 +1,5 @@
 """
-VoxDesk — WebSocket Connection Manager
+VoxDesk - WebSocket Connection Manager
 Real-time chat, screen preview, voice streaming.
 """
 
@@ -46,7 +46,7 @@ class ConnectionManager:
         channel: str = "chat",
         allowed_origins: List[str] | None = None,
     ):
-        """Yeni WebSocket bağlantısı kabul et — Origin validation ile."""
+        """Yeni WebSocket bağlantısı kabul et - Origin validation ile."""
         # Sprint 3.5: Parametre-level override > instance-level default
         effective_origins = allowed_origins or self._allowed_origins
         if effective_origins is not None:
@@ -64,7 +64,7 @@ class ConnectionManager:
         if channel not in self._active:
             self._active[channel] = []
         self._active[channel].append(websocket)
-        logger.info(f"WS bağlandı [{channel}] — aktif: {len(self._active[channel])}")
+        logger.info(f"WS bağlandı [{channel}] - aktif: {len(self._active[channel])}")
         return True
 
     def disconnect(self, websocket: WebSocket, channel: str = "chat"):
@@ -73,7 +73,7 @@ class ConnectionManager:
             self._active[channel].remove(websocket)
         if self._metrics:
             self._metrics.increment("ws_disconnects_total")
-        logger.info(f"WS ayrıldı [{channel}] — aktif: {len(self._active.get(channel, []))}")
+        logger.info(f"WS ayrıldı [{channel}] - aktif: {len(self._active.get(channel, []))}")
 
     async def send_json(self, websocket: WebSocket, data: dict):
         """Tek bir client'a JSON gönder."""
@@ -130,7 +130,7 @@ def check_origin(origin: str, allowed: List[str]) -> bool:
     Check if origin matches any pattern in the allowlist.
     Supports exact matches and wildcard port patterns (e.g. port replaced by *).
 
-    Sprint 1 Task 5 — OWASP WebSocket Origin validation.
+    Sprint 1 Task 5 - OWASP WebSocket Origin validation.
     """
     if origin is None:
         return True  # Missing origin header → non-browser/test client, allow

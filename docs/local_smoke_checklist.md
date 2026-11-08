@@ -1,4 +1,4 @@
-# VoxDesk — Local Smoke Checklist
+# VoxDesk - Local Smoke Checklist
 
 > Sprint 5.3 (Part 5b) kurulum sonrası gerçek donanımda doğrulanmış maddeler.
 > Bu çalıştırma kodu DEĞİL, manual verification listesidir.
@@ -59,7 +59,7 @@
 ## 6. Frontend Smoke
 
 - [ ] Open `http://127.0.0.1:8765` in browser → UI loads
-- [ ] Status bar shows model name → `Aktif — modelname`
+- [ ] Status bar shows model name → `Aktif - modelname`
 - [ ] DEV HUD visible → shows metrics
 - [ ] Screen preview shows captured frame
 
@@ -98,4 +98,4 @@ ANY unchecked → document issue, assess impact, fix or accept known limitation 
 
 - `Qwen3VLChatHandler` not available in `llama-cpp-python` v0.3.21 (requires JamePeng fork or upstream update).
 - `Gemma4ChatHandler` / `Gemma3ChatHandler` not available in v0.3.21.
-- POST `/chat` still uses ring buffer quality (1280/Q85) — low priority.
+- POST `/chat` still uses ring buffer quality (1280/Q85) - low priority.

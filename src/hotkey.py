@@ -1,5 +1,5 @@
 """
-VoxDesk — Global Hotkey Manager
+VoxDesk - Global Hotkey Manager
 4 ayrı kısayol: activate, toggle continuous, push-to-talk, pin-screen.
 """
 
@@ -50,7 +50,7 @@ class HotkeyManager:
         thread = threading.Thread(target=self._register_hotkeys, daemon=True)
         thread.start()
         logger.info(
-            f"⌨️ Hotkeys aktif — "
+            f"⌨️ Hotkeys aktif - "
             f"Activate: {self.activate_key}, "
             f"Toggle: {self.toggle_listen_key}, "
             f"PTT: {self.push_to_talk_key}, "
@@ -62,7 +62,7 @@ class HotkeyManager:
         try:
             import keyboard
 
-            # Activate — toggle UI
+            # Activate - toggle UI
             keyboard.add_hotkey(
                 self.activate_key,
                 lambda: self._fire("activate"),
@@ -76,14 +76,14 @@ class HotkeyManager:
                 suppress=True,
             )
 
-            # Pin screen — capture current screen for next message
+            # Pin screen - capture current screen for next message
             keyboard.add_hotkey(
                 self.pin_screen_key,
                 lambda: self._fire("pin_screen"),
                 suppress=True,
             )
 
-            # Push-to-talk — modifier + key combo ile çalışır
+            # Push-to-talk - modifier + key combo ile çalışır
             # Sadece son tuşa basmak yetmez, tüm modifier'lar basılı olmalı
             self._ptt_active = False
 

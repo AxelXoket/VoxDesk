@@ -1,7 +1,7 @@
 """
-VoxDesk — Conversation History Manager
+VoxDesk - Conversation History Manager
 Provider-agnostic konuşma geçmişi yönetimi.
-Model yüklemesi gerektirmez — saf Python logic.
+Model yüklemesi gerektirmez - saf Python logic.
 
 Design:
   - TEXT ONLY: History'de sadece metin saklanır. Image hiçbir şekilde tutulmaz.
@@ -25,7 +25,7 @@ MAX_HISTORY_CHARS = 8000
 
 class ConversationHistory:
     """
-    Text-only konuşma geçmişi — otomatik token budget yönetimi.
+    Text-only konuşma geçmişi - otomatik token budget yönetimi.
 
     - Image/visual memo history'de TUTULMAZ
     - Token sınırına yaklaşınca eski mesajlar auto-flush
@@ -72,13 +72,13 @@ class ConversationHistory:
         )
 
     def get_context_window(self) -> list[ChatMessage]:
-        """Son N mesajı döndür — LLM context'e gönderilecek kısım."""
+        """Son N mesajı döndür - LLM context'e gönderilecek kısım."""
         if not self._messages:
             return []
         return self._messages[-self._context_limit:]
 
     def add_user_message(self, content: str, visual_memo: str | None = None) -> ChatMessage:
-        """Kullanıcı mesajı ekle (TEXT ONLY — image bilgisi saklanmaz)."""
+        """Kullanıcı mesajı ekle (TEXT ONLY - image bilgisi saklanmaz)."""
         msg = ChatMessage(
             role="user",
             content=content,

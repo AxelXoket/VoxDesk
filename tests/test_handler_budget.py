@@ -1,5 +1,5 @@
 """
-VoxDesk — Sprint 5.3 Part 4b/5 Tests
+VoxDesk - Sprint 5.3 Part 4b/5 Tests
 Gemma4 Handler Fix + Budget Plumbing + Qwen3-VL Readiness + Validation Guards.
 """
 
@@ -164,7 +164,7 @@ class TestBudgetPlumbing:
         p = self._make_provider(preset="screen_ocr", n_ubatch=None)
         kwargs = {}
         p._apply_vision_budget("Gemma4ChatHandler", kwargs)
-        assert "image_min_tokens" not in kwargs  # Not applied — crash guard
+        assert "image_min_tokens" not in kwargs  # Not applied - crash guard
 
     def test_budget_insufficient_n_ubatch_rejected(self):
         p = self._make_provider(preset="screen_ocr", n_ubatch=512)
@@ -176,7 +176,7 @@ class TestBudgetPlumbing:
         p = self._make_provider(preset="screen_ocr", n_ubatch=1120)
         kwargs = {}
         p._apply_vision_budget("Gemma4ChatHandler", kwargs)
-        assert kwargs["image_min_tokens"] == 1120  # Exactly equal — accepted
+        assert kwargs["image_min_tokens"] == 1120  # Exactly equal - accepted
 
     def test_invalid_preset_rejected(self):
         p = self._make_provider(preset="invalid_preset", n_ubatch=2048)

@@ -1,5 +1,5 @@
 """
-VoxDesk — Module Registry Tests
+VoxDesk - Module Registry Tests
 Factory catalog lifecycle, create, exists, list, error handling.
 """
 
@@ -66,7 +66,7 @@ class TestRegistryBasics:
 # ══════════════════════════════════════════════════════════════
 
 class TestRegistryErrors:
-    """Error cases — unknown kind/name."""
+    """Error cases - unknown kind/name."""
 
     @pytest.mark.unit
     def test_create_unknown_kind(self):
@@ -183,7 +183,7 @@ class TestRegistryOverride:
 
     @pytest.mark.unit
     def test_factory_exception_propagates(self):
-        """Factory exception propagates to caller — no silent failure."""
+        """Factory exception propagates to caller - no silent failure."""
         def bad_factory(cfg):
             raise RuntimeError("GPU not available")
 

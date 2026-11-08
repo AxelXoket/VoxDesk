@@ -1,5 +1,5 @@
 /**
- * VoxDesk — Audio Capture Client
+ * VoxDesk - Audio Capture Client
  * AudioWorklet + binary WebSocket transfer.
  * MediaRecorder fallback AudioWorklet desteklenmediyse.
  *
@@ -15,7 +15,7 @@
  */
 
 // ══════════════════════════════════════════════════════════════
-//  Resampler — 48kHz/44.1kHz → 16kHz
+//  Resampler - 48kHz/44.1kHz → 16kHz
 // ══════════════════════════════════════════════════════════════
 
 /**
@@ -51,7 +51,7 @@ function resample(pcmData, fromRate, toRate) {
 
 
 // ══════════════════════════════════════════════════════════════
-//  Audio Capture — AudioWorklet + MediaRecorder Fallback
+//  Audio Capture - AudioWorklet + MediaRecorder Fallback
 // ══════════════════════════════════════════════════════════════
 
 const PROTOCOL_VERSION = 1;
@@ -70,7 +70,7 @@ class AudioCapture {
      * @param {number} options.maxRecordMs - Maksimum kayıt süresi (ms)
      */
     constructor(transport, options = {}) {
-        // Sprint 3.5: Backwards compat — raw WebSocket geçilirse adapter'a sar
+        // Sprint 3.5: Backwards compat - raw WebSocket geçilirse adapter'a sar
         // NOT: Bu sadece güvenlik ağıdır. Normal akış transport adapter kullanmalı.
         if (typeof WebSocket !== 'undefined' && transport instanceof WebSocket) {
             console.warn('[AudioCapture] Raw WebSocket deprecated, use transport adapter');
@@ -109,7 +109,7 @@ class AudioCapture {
         this._ackTimeoutMs = 3000;
         this._ackTimer = null;
 
-        // Sprint 7: RMS level callback — silence detection / waveform
+        // Sprint 7: RMS level callback - silence detection / waveform
         this.onLevelUpdate = null; // (rms: number) => void
     }
 
@@ -154,7 +154,7 @@ class AudioCapture {
 
     /**
      * Audio capture durdur.
-     * Sprint 3.5: Mode-aware stop — MediaRecorder fallback için audio_end göndermez.
+     * Sprint 3.5: Mode-aware stop - MediaRecorder fallback için audio_end göndermez.
      */
     stop() {
         this._recording = false;
@@ -181,7 +181,7 @@ class AudioCapture {
                 this._transport.sendControl({ type: 'audio_end' });
             }
         } else if (this._mode === 'mediarecorder') {
-            // Sprint 3.5: MediaRecorder mode — audio_end göndermiyoruz
+            // Sprint 3.5: MediaRecorder mode - audio_end göndermiyoruz
             // onstop callback legacy audio JSON gönderir, audio_end beklenmez
             if (this._mediaRecorder && this._mediaRecorder.state !== 'inactive') {
                 this._mediaRecorder.stop();
@@ -200,7 +200,7 @@ class AudioCapture {
         this._handshakeSent = false;
         this._pendingChunks = [];
 
-        console.log(`[AudioCapture] Durduruldu — ${this._chunkCount} chunks, mode: ${this._mode}`);
+        console.log(`[AudioCapture] Durduruldu - ${this._chunkCount} chunks, mode: ${this._mode}`);
     }
 
     /** @returns {string} 'worklet' | 'mediarecorder' | null */
@@ -230,7 +230,7 @@ class AudioCapture {
         this._workletNode.port.onmessage = (event) => {
             if (!this._recording) return;
 
-            // Sprint 7: RMS level mesajı — silence detection / waveform
+            // Sprint 7: RMS level mesajı - silence detection / waveform
             if (event.data.type === 'rms_level') {
                 if (this.onLevelUpdate) {
                     this.onLevelUpdate(event.data.rms);
@@ -259,18 +259,18 @@ class AudioCapture {
                 this._sendHandshake();
             }
 
-            // ACK bekle — buffer'a ekle
+            // ACK bekle - buffer'a ekle
             if (!this._handshakeAcked) {
                 // Sprint 3.5: Bounded pending buffer
                 if (this._pendingChunks.length >= this._maxPendingChunks) {
-                    console.warn('[AudioCapture] Max pending chunks — dropping oldest');
+                    console.warn('[AudioCapture] Max pending chunks - dropping oldest');
                     this._pendingChunks.shift();
                 }
                 this._pendingChunks.push(finalPcm.buffer);
                 return;
             }
 
-            // Binary gönder — Sprint 3.5: transport adapter
+            // Binary gönder - Sprint 3.5: transport adapter
             if (this._transport.isOpen()) {
                 this._transport.sendBinary(finalPcm.buffer);
                 this._chunkCount++;
@@ -285,7 +285,7 @@ class AudioCapture {
         };
 
         source.connect(this._workletNode);
-        // Worklet'i destination'a bağlama — sadece capture, playback yok
+        // Worklet'i destination'a bağlama - sadece capture, playback yok
         this._mode = 'worklet';
         this._sendHandshake();
 
@@ -306,12 +306,12 @@ class AudioCapture {
         });
 
         this._handshakeSent = true;
-        // ACK will be received via handleMessage() — do NOT set _handshakeAcked here
+        // ACK will be received via handleMessage() - do NOT set _handshakeAcked here
 
         // Sprint 3.5: ACK timeout
         this._ackTimer = setTimeout(() => {
             if (!this._handshakeAcked && this._recording) {
-                console.error('[AudioCapture] ACK timeout — stopping');
+                console.error('[AudioCapture] ACK timeout - stopping');
                 this.stop();
             }
         }, this._ackTimeoutMs);
@@ -332,7 +332,7 @@ class AudioCapture {
             }
             console.log('[AudioCapture] Handshake ACK received');
 
-            // Flush pending chunks — Sprint 3.5: transport adapter
+            // Flush pending chunks - Sprint 3.5: transport adapter
             if (this._transport.isOpen()) {
                 for (const buf of this._pendingChunks) {
                     this._transport.sendBinary(buf);
@@ -373,14 +373,14 @@ class AudioCapture {
 
             const blob = new Blob(chunks, { type: options.mimeType });
             const buffer = await blob.arrayBuffer();
-            // Use safe chunked base64 encoder (app.js) — btoa crashes on >2MB
+            // Use safe chunked base64 encoder (app.js) - btoa crashes on >2MB
             const base64 = (typeof window.arrayBufferToBase64 === 'function')
                 ? window.arrayBufferToBase64(buffer)
                 : btoa(new Uint8Array(buffer).reduce(
                     (data, byte) => data + String.fromCharCode(byte), ''
                 ));
 
-            // Legacy base64 path — Sprint 3.5: transport adapter
+            // Legacy base64 path - Sprint 3.5: transport adapter
             if (this._transport.isOpen()) {
                 this._transport.sendControl({
                     type: 'audio',

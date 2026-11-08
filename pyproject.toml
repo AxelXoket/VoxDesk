@@ -1,7 +1,7 @@
 [project]
 name = "voxdesk"
 version = "0.7.2"
-description = "VoxDesk — Local-only AI desktop assistant with screen analysis and voice chat"
+description = "VoxDesk - Local-only AI desktop assistant with screen analysis and voice chat"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115.0",
@@ -48,8 +48,8 @@ markers = [
     "integration: Requires mocked services or real config",
     "regression: Guards against known fixed bugs",
     "benchmark: Performance baseline measurements",
-    "gpu: Requires CUDA GPU — opt-in",
-    "model_required: Requires GGUF model files — opt-in",
+    "gpu: Requires CUDA GPU - opt-in",
+    "model_required: Requires GGUF model files - opt-in",
 ]
 
 [tool.coverage.run]

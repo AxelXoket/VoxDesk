@@ -1,5 +1,5 @@
 """
-VoxDesk — Configuration Management
+VoxDesk - Configuration Management
 Pydantic Settings ile merkezi yapılandırma.
 """
 
@@ -20,8 +20,8 @@ class CaptureConfig(BaseModel):
     backend: str = "dxcam"
     interval_seconds: float = 1.0
     buffer_size: int = 30
-    jpeg_quality: int = 85           # Legacy default — preview fallback
-    resize_width: int = 1920         # Legacy default — preview fallback
+    jpeg_quality: int = 85           # Legacy default - preview fallback
+    resize_width: int = 1920         # Legacy default - preview fallback
 
     # Part 3: Preview / Inference quality profiles
     preview_resize_width: int | None = None     # None → fallback to resize_width
@@ -50,7 +50,7 @@ class LLMConfig(BaseModel):
     model_config = ConfigDict(extra='forbid')
     provider: str = "llama-cpp"
 
-    # Local model paths — explicit, no auto-discovery, no runtime download
+    # Local model paths - explicit, no auto-discovery, no runtime download
     model_path: str | None = None
     mmproj_path: str | None = None
 
@@ -76,7 +76,7 @@ class LLMConfig(BaseModel):
     max_tokens: int = 512
     repeat_penalty: float = 1.15     # Prevent repetition loops
     context_messages: int = 10
-    # Sprint 3: multi-frame vision — 3D-Resampler doğrulandıktan sonra artır
+    # Sprint 3: multi-frame vision - 3D-Resampler doğrulandıktan sonra artır
     llm_frame_count: int = 1
 
 
@@ -84,14 +84,14 @@ class LocalLlamaServerConfig(BaseModel):
     """Config for app-managed local llama-server sidecar.
 
     Privacy guarantee: base_url MUST be localhost-only.
-    This is enforced at validation time — remote URLs are rejected.
+    This is enforced at validation time - remote URLs are rejected.
 
     Dev path: Use Docker-provided llama-server.exe
     Prod path: Bundled llama-server.exe next to VoxDesk.exe
     """
     model_config = ConfigDict(extra='forbid')
 
-    enabled: bool = False                 # Master switch — disabled until configured
+    enabled: bool = False                 # Master switch - disabled until configured
     executable_path: str = ""             # Path to llama-server.exe (dev: Docker path)
     base_url: str = "http://127.0.0.1:8081"   # Local-only API endpoint
     port: int = 8081                      # Sidecar listen port
@@ -145,7 +145,7 @@ class TranslatorConfig(BaseModel):
     engine: str = "marian"
     model_path: str = "models/opus-mt-tr-en"
     device: str = "cuda"
-    enabled: bool = False  # LLM handles multilingual natively — translator dormant
+    enabled: bool = False  # LLM handles multilingual natively - translator dormant
 
 
 class VoiceActivationConfig(BaseModel):
@@ -164,9 +164,9 @@ class HotkeyConfig(BaseModel):
 
 class HistoryConfig(BaseModel):
     model_config = ConfigDict(extra='forbid')
-    max_messages: int = 500       # BACKLOG: Not yet wired — ConversationHistory uses MAX_HISTORY_CHARS
-    auto_save: bool = False       # BACKLOG: Not yet implemented — reserved for future sprint
-    save_path: str = "./data/history/"  # BACKLOG: Not yet implemented — reserved for future sprint
+    max_messages: int = 500       # BACKLOG: Not yet wired - ConversationHistory uses MAX_HISTORY_CHARS
+    auto_save: bool = False       # BACKLOG: Not yet implemented - reserved for future sprint
+    save_path: str = "./data/history/"  # BACKLOG: Not yet implemented - reserved for future sprint
 
 
 class PersonalityConfig(BaseModel):
@@ -179,7 +179,7 @@ class PersonalityConfig(BaseModel):
 
     # ── Modüler Prompt Bölümleri ─────────────────────────────
     system_prompt: str = ""           # Ana davranış kuralları ve kişilik tanımı
-    stt_context: str = ""             # Whisper initial_prompt — domain vocabulary
+    stt_context: str = ""             # Whisper initial_prompt - domain vocabulary
     screen_analysis_prompt: str = ""  # Ekran yorumlama talimatları
     emotion_rules: str = ""           # Duygu algılama/yansıtma filtresi
     response_format: str = ""         # Çıktı biçim kuralları (voice vs text)
@@ -188,7 +188,7 @@ class PersonalityConfig(BaseModel):
 # ── Privacy & Security Configs ───────────────────────────────
 
 class PrivacyConfig(BaseModel):
-    """Local-only runtime contract — hiçbir veri dışarı çıkmaz."""
+    """Local-only runtime contract - hiçbir veri dışarı çıkmaz."""
     model_config = ConfigDict(extra='forbid')
     offline_mode: bool = True
     allow_cloud_providers: bool = False
@@ -208,14 +208,14 @@ class NetworkConfig(BaseModel):
 
 
 class ModelLoadingConfig(BaseModel):
-    """Model loading policy — no runtime downloads."""
+    """Model loading policy - no runtime downloads."""
     model_config = ConfigDict(extra='forbid')
     local_files_only: bool = True
     fail_if_model_missing: bool = True
 
 
 class FeaturesConfig(BaseModel):
-    """Feature flags — restart-only, no runtime toggle."""
+    """Feature flags - restart-only, no runtime toggle."""
     model_config = ConfigDict(extra='forbid')
     enable_module_registry: bool = True
     enable_vram_unload: bool = True
@@ -312,7 +312,7 @@ def load_config() -> AppConfig:
             "hotkeys": raw.get("hotkeys", {}),
             "history": raw.get("history", {}),
             "personality_name": raw.get("personality", "voxly"),
-            # Sprint 1 — Gap 5: map missing nested config sections
+            # Sprint 1 - Gap 5: map missing nested config sections
             "privacy": raw.get("privacy", {}),
             "network": raw.get("network", {}),
             "model_loading": raw.get("model_loading", {}),

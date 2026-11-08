@@ -1,5 +1,5 @@
 """
-VoxDesk — Sprint 5.0 System Prompt Architecture Tests
+VoxDesk - Sprint 5.0 System Prompt Architecture Tests
 PersonalityConfig modüler alanları, prompt composer, STT initial_prompt,
 ve voice/text response mode testi.
 """
@@ -12,7 +12,7 @@ from src.config import PersonalityConfig, AppConfig
 
 
 # ══════════════════════════════════════════════════════════════
-#  PersonalityConfig — Modüler Prompt Alanları
+#  PersonalityConfig - Modüler Prompt Alanları
 # ══════════════════════════════════════════════════════════════
 
 class TestPersonalityConfig:
@@ -20,7 +20,7 @@ class TestPersonalityConfig:
 
     @pytest.mark.unit
     def test_default_personality_has_empty_prompt_sections(self):
-        """Default PersonalityConfig — tüm prompt alanları boş string."""
+        """Default PersonalityConfig - tüm prompt alanları boş string."""
         p = PersonalityConfig()
         assert p.system_prompt == ""
         assert p.stt_context == ""
@@ -59,7 +59,7 @@ class TestPersonalityConfig:
     def test_voxly_yaml_loads_all_sections(self):
         """voxly.yaml dosyası tüm modüler prompt alanlarını içermeli.
 
-        Not: emotion_rules bilinçli olarak boş bırakılabilir —
+        Not: emotion_rules bilinçli olarak boş bırakılabilir -
         küçük modellerde duygu filtresi karmaşıklık ekler.
         """
         from src.config import load_personality
@@ -87,7 +87,7 @@ class TestPersonalityConfig:
             # Screen analysis
             assert "screen" in voxly.screen_analysis_prompt.lower()
             assert "specific" in voxly.screen_analysis_prompt.lower()
-            # Emotion — intentionally empty in current personality
+            # Emotion - intentionally empty in current personality
             # No assertion on emotion_rules content
             # Response format
             assert "voice" in voxly.response_format.lower()
@@ -262,7 +262,7 @@ class TestPromptRegressionGuards:
 
 
 # ══════════════════════════════════════════════════════════════
-#  Sprint 5.1 — Personality Swap → STT Context Update
+#  Sprint 5.1 - Personality Swap → STT Context Update
 # ══════════════════════════════════════════════════════════════
 
 class TestSTTInitialPromptUpdate:
@@ -319,7 +319,7 @@ class TestPersonalitySwapSTTWiring:
 
     @pytest.mark.unit
     def test_personality_route_stt_update_guarded(self):
-        """STT güncelleme state.stt None olabilir — guard olmalı."""
+        """STT güncelleme state.stt None olabilir - guard olmalı."""
         from pathlib import Path
         source = Path("src/routes/settings.py").read_text(encoding="utf-8")
         # hasattr guard olmalı

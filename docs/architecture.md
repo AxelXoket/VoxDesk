@@ -1,12 +1,12 @@
-# VoxDesk Architecture — Production Reference
+# VoxDesk Architecture - Production Reference
 
-> **Version** : v0.7.2 — Sprint 7.2 : Stabilization — FVM stuck fix, UI calm, screen prompt policy, Gemma4 default  
+> **Version** : v0.7.2 - Sprint 7.2 : Stabilization - FVM stuck fix, UI calm, screen prompt policy, Gemma4 default  
 > **Runtime** : Python 3.12 + FastAPI + Uvicorn  
 > **Inference** : Local-only (Whisper STT, Kokoro TTS, Gemma4 via llama-server sidecar, llama-cpp-python fallback)  
-> **GPU** : RTX 5080 (Blackwell, SM 12.0) — CUDA 12.8  
+> **GPU** : RTX 5080 (Blackwell, SM 12.0) - CUDA 12.8  
 > **Audio** : PCM binary WebSocket (v1) + legacy base64 fallback  
 > **Voice Pipeline** : Mic → STT (auto-detect TR/EN) → LLM (multilingual, screen context optional) → TTS → Speaker  
-> **Note** : Translator (MarianMT TR→EN) is available but disabled by default — LLM handles multilingual natively.
+> **Note** : Translator (MarianMT TR→EN) is available but disabled by default - LLM handles multilingual natively.
 
 ---
 
@@ -51,7 +51,7 @@
 
 | State | Label | Behavior |
 |:------|:------|:---------|
-| `idle` | — | FVM off, chat UI visible |
+| `idle` | - | FVM off, chat UI visible |
 | `listening` | Dinliyorum... | Mic active, waiting for speech (RMS > threshold) |
 | `user_speaking` | Konuşuyor... | User is speaking, waveform active |
 | `silence_countdown` | Sessizlik algılandı... | RMS < threshold for up to 3s, timer running |
@@ -63,7 +63,7 @@
 
 - Threshold : `FVM_SILENCE_RMS_THRESHOLD = 0.01` (JS constant)
 - Duration : `FVM_SILENCE_DURATION_MS = 3000` (3 seconds)
-- Guard : `hasSpokeYet` — turn only closes after user has spoken at least once
+- Guard : `hasSpokeYet` - turn only closes after user has spoken at least once
 - Implementation : Frontend-only via AudioWorklet RMS reports (~21ms granularity)
 
 ### Read-Aloud Endpoint
@@ -72,7 +72,7 @@
 |:-------|:-------|
 | Endpoint | `POST /api/tts/read` |
 | Request | `{ "text": "..." }` |
-| Success | `200 audio/wav` — WAV bytes |
+| Success | `200 audio/wav` - WAV bytes |
 | Empty text | `400 { "error": "empty_text" }` |
 | Too long | `400 { "error": "text_too_long", "max": 2000 }` |
 | TTS off | `503 { "error": "tts_unavailable" }` |
@@ -115,19 +115,19 @@ Single `activeAudio` reference in `app.js` prevents simultaneous playback:
 
 - **Pin** : User hotkey (Ctrl+Shift+S) captures inference-quality frame, consumed once
 - **Ring buffer** : Preview-quality frames from dxcam capture loop (1s interval)
-- **grab_now()** : Explicit immediate capture (dxcam-first, PIL fallback) — reserved for pin/hotkey
+- **grab_now()** : Explicit immediate capture (dxcam-first, PIL fallback) - reserved for pin/hotkey
 
 ### Frontend Behavior
 
 - Screen context toggle : ON by default (`alwaysOnToggle`)
-- No manual screenshot attachment — upload/drag-drop/paste flow removed
+- No manual screenshot attachment - upload/drag-drop/paste flow removed
 - Live preview sidebar shows capture status
 - Pin indicator shows when a pinned frame will be used
 
 ### Backlog
 
-- Temporal multi-frame selection (long-message start/end frame) — future sprint
-- Input lifecycle tracking (`input_started_at`, `typing_duration`) — future sprint
+- Temporal multi-frame selection (long-message start/end frame) - future sprint
+- Input lifecycle tracking (`input_started_at`, `typing_duration`) - future sprint
 
 ---
 
@@ -191,12 +191,12 @@ The default LLM provider runs a **local llama-server subprocess** (sidecar):
 |:---------|:------|
 | Provider class | `LocalLlamaServerProvider` |
 | Transport | `httpx` → `http://127.0.0.1:<port>` only |
-| Protocol | OpenAI-compatible `/v1/chat/completions` — **local API format only, not OpenAI cloud** |
+| Protocol | OpenAI-compatible `/v1/chat/completions` - **local API format only, not OpenAI cloud** |
 | Vision | `image_url` with `data:image/jpeg;base64,...` payload via libmtmd/mmproj |
-| Lifecycle | `SidecarManager` — auto-start, health-check, graceful shutdown |
-| Handler blocker | `Gemma4ChatHandler` is **not needed** — sidecar uses libmtmd natively |
+| Lifecycle | `SidecarManager` - auto-start, health-check, graceful shutdown |
+| Handler blocker | `Gemma4ChatHandler` is **not needed** - sidecar uses libmtmd natively |
 | Security | Remote URLs rejected at constructor time (`ValueError`) |
-| Logging | Base64 image data **never logged** — only metadata (size, source, endpoint) |
+| Logging | Base64 image data **never logged** - only metadata (size, source, endpoint) |
 
 **Config** (`config/default.yaml`):
 ```yaml
@@ -258,7 +258,7 @@ llm:
 
 All image sources pass through `CanonicalImageArtifact` before reaching the LLM:
 - Uniform interface for `ws_screen`, `pinned_frame`, `grab_now`, and `upload`.
-- Image history stores only references — **no raw/base64 in conversation history**.
+- Image history stores only references - **no raw/base64 in conversation history**.
 - `ImageMetadata` tracks source, resolution, format, byte size, and content hash.
 
 ---
@@ -338,10 +338,10 @@ Client                              Server
 
 ### Frame Validation Rules
 
-1. **Even byte count** — 16-bit samples require `len(data) % 2 == 0`
-2. **Min size** — At least 2 bytes (1 sample)
-3. **Max size** — Config-backed via `SecurityConfig.max_ws_frame_bytes` (default 64 KB)
-4. **Handshake required** — Binary frames rejected before `audio_config`
+1. **Even byte count** - 16-bit samples require `len(data) % 2 == 0`
+2. **Min size** - At least 2 bytes (1 sample)
+3. **Max size** - Config-backed via `SecurityConfig.max_ws_frame_bytes` (default 64 KB)
+4. **Handshake required** - Binary frames rejected before `audio_config`
 
 ### PCM Decode
 
@@ -389,9 +389,9 @@ If `AudioWorklet` is unavailable or fails:
 
 | Error | Behavior |
 |:---|:---|
-| Permission denied | Throws — UI must catch and display |
-| No device | Throws — same handling |
-| Device busy | Throws — same handling |
+| Permission denied | Throws - UI must catch and display |
+| No device | Throws - same handling |
+| Device busy | Throws - same handling |
 | AudioWorklet addModule fail | Falls back to MediaRecorder |
 | `processorerror` event | Falls back to MediaRecorder |
 
@@ -525,7 +525,7 @@ Safe runtime snapshot with model states, capture status, connections, and featur
 
 ### `/api/debug/metrics` (Dev/Debug)
 
-Full process-local metrics. **Gated by `enable_debug_metrics` feature flag** — returns HTTP 403 when disabled (default: disabled).
+Full process-local metrics. **Gated by `enable_debug_metrics` feature flag** - returns HTTP 403 when disabled (default: disabled).
 
 Contains: registry catalog, engine config, VRAM model states, sliding-window percentiles.
 
@@ -576,7 +576,7 @@ python -m pytest tests/test_audio_protocol.py -v
 
 - **Target**: ≥55% (`--cov-fail-under=55`)
 - **Current**: ~65%
-- **Low coverage modules**: Route handlers (23–51%) — require real WebSocket/HTTP integration tests
+- **Low coverage modules**: Route handlers (23-51%) - require real WebSocket/HTTP integration tests
 
 ### WebSocket Origin Validation
 
@@ -595,17 +595,17 @@ Rejection uses the accept-then-close pattern (Starlette requires `accept()` befo
 Factory catalog with immutable registrations:
 
 ```python
-# Startup (lifespan) — register factories ONCE
+# Startup (lifespan) - register factories ONCE
 registry.register("stt", "faster-whisper", lambda cfg: SpeechRecognizer(...))
 
-# Startup — create instances ONCE
+# Startup - create instances ONCE
 state.stt = registry.create("stt", config.stt.engine, config.stt)
 
-# Request path — NEVER call registry.create()
+# Request path - NEVER call registry.create()
 # Use: state = get_app_state(); state.stt.transcribe_audio(...)
 ```
 
-**Config validation**: All models use `extra='forbid'` — unknown fields cause startup failure.
+**Config validation**: All models use `extra='forbid'` - unknown fields cause startup failure.
 
 ---
 
@@ -618,4 +618,4 @@ async def _safe_shutdown():
     # Individual failures don't crash other cleanups
 ```
 
-`_safe_shutdown()` is async — properly awaits `vram_manager.stop_monitor()`. Shutdown order: VRAM → Capture → STT → TTS → Translator → LLM → Hotkeys → Tray.
+`_safe_shutdown()` is async - properly awaits `vram_manager.stop_monitor()`. Shutdown order: VRAM → Capture → STT → TTS → Translator → LLM → Hotkeys → Tray.

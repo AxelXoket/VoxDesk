@@ -1,7 +1,7 @@
 """
-VoxDesk — Phase 4 Integration Tests
+VoxDesk - Phase 4 Integration Tests
 STT/TTS ManagedModel lifecycle, VRAM manager wiring, config validation.
-GERÇEK MODEL YÜKLEME YOK — tüm testler mock/fake ile.
+GERÇEK MODEL YÜKLEME YOK - tüm testler mock/fake ile.
 """
 
 import pytest
@@ -51,7 +51,7 @@ class TestSTTLifecycle:
         )
 
         # Manuel load + acquire (transcribe simülasyonu)
-        # _do_load yapamayız (model yok) — lifecycle state'i elle set edelim
+        # _do_load yapamayız (model yok) - lifecycle state'i elle set edelim
         stt._lifecycle._state = ModelState.LOADED
         stt._lifecycle._loaded_at = 0
         stt._lifecycle._last_used = 0
@@ -75,7 +75,7 @@ class TestSTTLifecycle:
         from src.stt import SpeechRecognizer
         stt = SpeechRecognizer(activation_threshold_db=-30.0)
 
-        # close — no crash on unloaded
+        # close - no crash on unloaded
         stt.close()
         assert stt._lifecycle.state == ModelState.UNLOADED
 
@@ -267,7 +267,7 @@ class TestTranslatorLifecycle:
             min_loaded_seconds=0,
             unload_cooldown_seconds=0,
         )
-        # Manuel state — gerçek model yükleme olmadan
+        # Manuel state - gerçek model yükleme olmadan
         tr._lifecycle._state = ModelState.LOADED
         tr._lifecycle._loaded_at = 0
         tr._lifecycle._last_used = 0

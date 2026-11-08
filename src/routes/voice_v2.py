@@ -1,12 +1,12 @@
 """
-VoxDesk — Binary Audio WebSocket Handler
-/ws/voice/v2 — PCM binary transfer protocol.
+VoxDesk - Binary Audio WebSocket Handler
+/ws/voice/v2 - PCM binary transfer protocol.
 
 Receive loop:
     1. Text frame → JSON dispatch (audio_config, audio_end, audio_cancel)
     2. Binary frame → PCM decode (only after handshake)
 
-Voice mode — unified screen context:
+Voice mode - unified screen context:
     Screen context ON ise ses isteğine otomatik ekran bağlamı eklenir.
     Screen context OFF ise LLM'e image artifact gönderilmez.
     Chat pipeline ile aynı politika: get_best_frame() → build_artifact_from_frame().
@@ -49,7 +49,7 @@ router = APIRouter(prefix="/api", tags=["voice_v2"])
 @router.websocket("/ws/voice/v2")
 async def ws_voice_v2(websocket: WebSocket):
     """
-    Binary audio WebSocket — PCM S16LE transfer.
+    Binary audio WebSocket - PCM S16LE transfer.
 
     Protocol:
         1. Client → audio_config (JSON text frame)
@@ -108,7 +108,7 @@ async def ws_voice_v2(websocket: WebSocket):
                     session.accept_handshake(config)
                     await websocket.send_json(build_config_ack(config))
                     logger.debug(
-                        f"Audio handshake OK — "
+                        f"Audio handshake OK - "
                         f"v{config.protocol_version}, "
                         f"{config.sample_rate}Hz"
                     )
@@ -119,7 +119,7 @@ async def ws_voice_v2(websocket: WebSocket):
                     if not session.handshake_done:
                         await websocket.send_json(
                             build_protocol_error(
-                                "audio_end — handshake yapılmamış",
+                                "audio_end - handshake yapılmamış",
                                 "no_handshake"
                             )
                         )
@@ -142,7 +142,7 @@ async def ws_voice_v2(websocket: WebSocket):
                 if msg_type == AudioMessageType.AUDIO_CANCEL.value:
                     audio_buffer.clear()
                     session.reset()
-                    logger.debug("Audio cancel — buffer temizlendi")
+                    logger.debug("Audio cancel - buffer temizlendi")
                     await websocket.send_json({"type": "audio_cancelled"})
                     continue
 
@@ -170,7 +170,7 @@ async def ws_voice_v2(websocket: WebSocket):
                 if not session.handshake_done:
                     await websocket.send_json(
                         build_protocol_error(
-                            "Binary frame — önce audio_config gönder",
+                            "Binary frame - önce audio_config gönder",
                             "binary_before_handshake"
                         )
                     )
@@ -190,7 +190,7 @@ async def ws_voice_v2(websocket: WebSocket):
                 continue
 
     except WebSocketDisconnect:
-        logger.debug(f"Voice v2 disconnect — {session.total_chunks} chunks")
+        logger.debug(f"Voice v2 disconnect - {session.total_chunks} chunks")
     except Exception as e:
         logger.error(f"WS voice v2 hatası: {e}")
         state.record_error(f"Voice WS: {e}")  # Sprint 3.5
@@ -254,7 +254,7 @@ async def _process_audio_buffer(
     # Voice mode: LLM algılar dili, çeviri yapılmaz.
     llm_input = text
 
-    # Screen context — unified policy (chat/voice aynı davranış)
+    # Screen context - unified policy (chat/voice aynı davranış)
     # Sprint 8.1: Use declared AppState field
     voice_artifact = None
     if state.screen_context_enabled and state.capture:
@@ -264,10 +264,10 @@ async def _process_audio_buffer(
             voice_artifact = build_artifact_from_frame(frame, source_override="voice_screen")
             logger.info(f"🎤📸 Voice v2: screen artifact ({frame.width}x{frame.height})")
 
-    # LLM — async, non-blocking
+    # LLM - async, non-blocking
     try:
         if state.llm is None:
-            raise RuntimeError("LLM unavailable — local model file missing")
+            raise RuntimeError("LLM unavailable - local model file missing")
         llm_response = await state.llm.chat(llm_input, image_artifact=voice_artifact, response_mode="voice")
     except Exception as llm_err:
         logger.error(f"Voice LLM error: {llm_err}")
@@ -286,7 +286,7 @@ async def _process_audio_buffer(
         "text": llm_response,
     })
 
-    # TTS — streaming, executor'da çalışır
+    # TTS - streaming, executor'da çalışır
     if state.tts and state.tts.enabled:
         import soundfile as sf
 
@@ -332,7 +332,7 @@ async def _handle_legacy_audio(
     data: dict,
 ) -> None:
     """
-    Legacy base64 audio path — geriye dönük uyumluluk.
+    Legacy base64 audio path - geriye dönük uyumluluk.
     enable_binary_audio=false iken bu path kullanılır.
     """
     audio_b64 = data.get("audio", "")
@@ -356,7 +356,7 @@ async def _handle_legacy_audio(
         )
         return
 
-    # Sprint 3: audio_utils'ten import — chat.py cross-import kaldırıldı
+    # Sprint 3: audio_utils'ten import - chat.py cross-import kaldırıldı
     from src.audio_utils import decode_audio_webm, decode_audio_raw_pcm
 
     if audio_format == "pcm":
@@ -371,7 +371,7 @@ async def _handle_legacy_audio(
         return
 
     # Delegate to shared pipeline
-    # Sprint 3: __import__ anti-pattern kaldırıldı — AudioConfig zaten import edildi
+    # Sprint 3: __import__ anti-pattern kaldırıldı - AudioConfig zaten import edildi
     temp_session = AudioSession()
     temp_session.accept_handshake(AudioConfig())
 
@@ -394,7 +394,7 @@ async def _handle_legacy_audio(
     # Voice mode: çeviri yok, LLM orijinal dilde cevaplar
     llm_input = text
 
-    # Screen context — unified policy (legacy fallback da aynı davranış)
+    # Screen context - unified policy (legacy fallback da aynı davranış)
     # Sprint 8.1: Use declared AppState field
     voice_artifact = None
     if state.screen_context_enabled and state.capture:
@@ -406,7 +406,7 @@ async def _handle_legacy_audio(
 
     try:
         if state.llm is None:
-            raise RuntimeError("LLM unavailable — local model file missing")
+            raise RuntimeError("LLM unavailable - local model file missing")
         llm_response = await state.llm.chat(llm_input, image_artifact=voice_artifact, response_mode="voice")
     except Exception as llm_err:
         logger.error(f"Voice legacy LLM error: {llm_err}")
@@ -424,7 +424,7 @@ async def _handle_legacy_audio(
         "text": llm_response,
     })
 
-    # TTS — streaming, executor'da çalışır
+    # TTS - streaming, executor'da çalışır
     if state.tts and state.tts.enabled:
         import soundfile as sf
 

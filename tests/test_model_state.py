@@ -1,7 +1,7 @@
 ﻿"""
-VoxDesk — Model State Machine Tests
+VoxDesk - Model State Machine Tests
 ManagedModel lifecycle, ref_count, unload guards, state transitions.
-GERÇEK MODEL YÜKLEME YOK — tüm testler mock/fake model ile.
+GERÇEK MODEL YÜKLEME YOK - tüm testler mock/fake model ile.
 """
 
 import time
@@ -13,11 +13,11 @@ from src.model_state import ManagedModel, ModelState
 
 
 # ══════════════════════════════════════════════════════════════
-#  Fake Model — test-only, gerçek GPU/model yok
+#  Fake Model - test-only, gerçek GPU/model yok
 # ══════════════════════════════════════════════════════════════
 
 class FakeModel(ManagedModel):
-    """Test-only ManagedModel subclass — no real model loading."""
+    """Test-only ManagedModel subclass - no real model loading."""
 
     def __init__(self, *, should_fail: bool = False, **kwargs):
         super().__init__(**kwargs)
@@ -98,7 +98,7 @@ class TestLoadUnload:
         # İkinci load çağrısı
         result = m.load()
         assert result is True
-        assert m.load_count == 1  # Hâlâ 1 — ikinci model yaratılmadı
+        assert m.load_count == 1  # Hâlâ 1 - ikinci model yaratılmadı
 
     @pytest.mark.unit
     def test_unload_success(self):
@@ -231,7 +231,7 @@ class TestUnloadPolicy:
         """min_loaded_seconds dolmadan unload reddedilmeli."""
         m = FakeModel(name="test-stt", min_loaded_seconds=60.0, unload_cooldown_seconds=0)
         m.load()
-        # Hemen unload dene — 60s dolmadı
+        # Hemen unload dene - 60s dolmadı
         assert m.safe_unload() is False
         assert m.state == ModelState.LOADED
 
@@ -241,11 +241,11 @@ class TestUnloadPolicy:
         m = FakeModel(name="test-stt", min_loaded_seconds=0, unload_cooldown_seconds=60.0)
         m.load()
 
-        # İlk unload — başarılı
+        # İlk unload - başarılı
         m.safe_unload()
         assert m.state == ModelState.UNLOADED
 
-        # Tekrar load + hemen unload — cooldown aktif
+        # Tekrar load + hemen unload - cooldown aktif
         m.load()
         assert m.safe_unload() is False  # Cooldown henüz dolmadı
         assert m.state == ModelState.LOADED

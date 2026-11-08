@@ -1,5 +1,5 @@
 /**
- * VoxDesk — WebSocket Communication
+ * VoxDesk - WebSocket Communication
  * Chat, screen preview, voice WebSocket bağlantıları.
  */
 
@@ -128,10 +128,10 @@ class VoxWebSocket {
             try {
                 const data = JSON.parse(event.data);
                 this.emit('voice:message', data);
-            } catch (e) { /* binary frame or parse error — ignore */ }
+            } catch (e) { /* binary frame or parse error - ignore */ }
         };
 
-        // Sprint 2: NO auto-reconnect for voice — user manually retries
+        // Sprint 2: NO auto-reconnect for voice - user manually retries
         this.voiceWs.onclose = () => {
             console.log('[WS] Voice disconnected');
             this.emit('voice:disconnected');
@@ -180,7 +180,7 @@ class VoxWebSocket {
         return false;
     }
 
-    // Legacy compatibility — routes through sendVoiceControl
+    // Legacy compatibility - routes through sendVoiceControl
     sendVoiceAudio(audioBase64, format = 'webm') {
         return this.sendVoiceControl({
             type: 'audio',

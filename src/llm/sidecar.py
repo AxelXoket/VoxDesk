@@ -1,5 +1,5 @@
 """
-VoxDesk — Local llama-server Sidecar Manager
+VoxDesk - Local llama-server Sidecar Manager
 Manages the lifecycle of a local llama-server process.
 
 Architecture:
@@ -15,7 +15,7 @@ Architecture:
     → cleanup
 
 Privacy:
-  - Always binds to 127.0.0.1 — never 0.0.0.0
+  - Always binds to 127.0.0.1 - never 0.0.0.0
   - No external network access
   - Model files remain local
 
@@ -108,7 +108,7 @@ class SidecarManager:
         # Check if something is already running on the target port
         if await self._check_port_health():
             logger.info(
-                f"Server already running on port {self._config.port} — reusing"
+                f"Server already running on port {self._config.port} - reusing"
             )
             self._healthy = True
             return True
@@ -154,7 +154,7 @@ class SidecarManager:
 
             await asyncio.sleep(2.0)
 
-        # Timeout — kill and fail
+        # Timeout - kill and fail
         self.stop_sync()
         raise RuntimeError(
             f"llama-server failed to become healthy within "
@@ -185,7 +185,7 @@ class SidecarManager:
         return self._process is not None and self._process.poll() is None
 
     def stop_sync(self) -> None:
-        """Synchronous stop — for use in atexit / signal handlers."""
+        """Synchronous stop - for use in atexit / signal handlers."""
         if self._process is None:
             return
 
@@ -198,7 +198,7 @@ class SidecarManager:
                 self._process.wait(timeout=self._config.shutdown_timeout_seconds)
                 logger.info(f"llama-server (PID {pid}) terminated cleanly")
             except subprocess.TimeoutExpired:
-                logger.warning(f"llama-server (PID {pid}) did not stop — killing")
+                logger.warning(f"llama-server (PID {pid}) did not stop - killing")
                 self._process.kill()
                 self._process.wait(timeout=5)
         except Exception as e:

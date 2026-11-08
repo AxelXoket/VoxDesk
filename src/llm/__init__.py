@@ -1,5 +1,5 @@
 """
-VoxDesk — LLM Package
+VoxDesk - LLM Package
 Local-only inference via llama-cpp-python.
 
 Usage:

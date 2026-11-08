@@ -1,7 +1,7 @@
 ﻿"""
-VoxDesk — VRAM Manager Tests
+VoxDesk - VRAM Manager Tests
 VRAMManager model registration, reporting, idle unload, metrics, GPU guard.
-GERÇEK GPU/MODEL YÜKLEME YOK — tüm testler mock ile.
+GERÇEK GPU/MODEL YÜKLEME YOK - tüm testler mock ile.
 GPU smoke test opsiyonel ve skip'li.
 """
 
@@ -16,7 +16,7 @@ from src.metrics import MetricsCollector
 
 
 # ══════════════════════════════════════════════════════════════
-#  Fake Model — same as test_model_state.py
+#  Fake Model - same as test_model_state.py
 # ══════════════════════════════════════════════════════════════
 
 class FakeModel(ManagedModel):
@@ -153,7 +153,7 @@ class TestVRAMCleanup:
         m1 = FakeModel(name="stt", min_loaded_seconds=0, unload_cooldown_seconds=0)
         m1.load()
 
-        # close() override — error simülasyonu
+        # close() override - error simülasyonu
         original_close = m1.close
         call_count = [0]
         def failing_close():
@@ -173,7 +173,7 @@ class TestVRAMCleanup:
 # ══════════════════════════════════════════════════════════════
 
 class TestGPUGuard:
-    """torch.cuda.is_available() guard — CPU ortamda crash yok."""
+    """torch.cuda.is_available() guard - CPU ortamda crash yok."""
 
     @pytest.mark.unit
     def test_cuda_available_no_crash(self):
@@ -197,7 +197,7 @@ class TestGPUGuard:
     @pytest.mark.unit
     @pytest.mark.skipif(
         not _cuda_available(),
-        reason="GPU yok — smoke test skip"
+        reason="GPU yok - smoke test skip"
     )
     def test_vram_stats_with_gpu(self):
         """GPU varsa detaylı stats dönmeli (opsiyonel smoke test)."""

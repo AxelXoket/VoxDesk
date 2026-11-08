@@ -1,5 +1,5 @@
 """
-VoxDesk — Regression Test Suite
+VoxDesk - Regression Test Suite
 Bilinen bug'ların geri dönmemesini, API contract'ların kırılmamasını,
 ve performans baseline'ının korunmasını garanti eder.
 
@@ -24,7 +24,7 @@ class TestBugRegressions:
     @pytest.mark.regression
     def test_no_external_cdn_in_html(self):
         """
-        REGRESSION: CDN leak — external URL olmamalı.
+        REGRESSION: CDN leak - external URL olmamalı.
         Fix: Google Fonts kaldırılıp system font kullanıldı.
         """
         frontend_dir = Path(__file__).parent.parent / "frontend"
@@ -75,7 +75,7 @@ class TestBugRegressions:
 
         source = inspect.getsource(lifespan)
         assert "raise" in source, \
-            "lifespan() exception'ı yutmamalı — raise olmalı"
+            "lifespan() exception'ı yutmamalı - raise olmalı"
 
     @pytest.mark.regression
     def test_pystray_callback_params(self):
@@ -117,11 +117,11 @@ class TestBugRegressions:
 
     @pytest.mark.regression
     def test_localhost_only_binding(self):
-        """Host her zaman 127.0.0.1 olmalı — privacy contract."""
+        """Host her zaman 127.0.0.1 olmalı - privacy contract."""
         from src.config import AppConfig
         cfg = AppConfig()
         assert cfg.host == "127.0.0.1", \
-            f"Host {cfg.host} olmamalı — sadece 127.0.0.1"
+            f"Host {cfg.host} olmamalı - sadece 127.0.0.1"
 
 
 # ══════════════════════════════════════════════════════════════
@@ -262,7 +262,7 @@ class TestPrivacyRegression:
             "127.0.0.1",
             "localhost",
             "0.0.0.0",
-            "8.8.8.8",          # isolation.py probe — bilerek var
+            "8.8.8.8",          # isolation.py probe - bilerek var
             "http://localhost",
             "http://127.0.0.1",
         ]
@@ -293,7 +293,7 @@ class TestPrivacyRegression:
 # ══════════════════════════════════════════════════════════════
 
 class TestPerformanceBaseline:
-    """Deterministic CPU-bound fonksiyonlar — hardware bağımsız."""
+    """Deterministic CPU-bound fonksiyonlar - hardware bağımsız."""
 
     @pytest.mark.benchmark
     def test_build_messages_perf(self, benchmark, make_llm):
@@ -343,7 +343,7 @@ class TestPerformanceBaseline:
 
 
 # ══════════════════════════════════════════════════════════════
-#  Sprint 1 — Static File Regression Guards
+#  Sprint 1 - Static File Regression Guards
 # ══════════════════════════════════════════════════════════════
 
 class TestSprint1StaticGuards:
@@ -427,7 +427,7 @@ class TestSprint1StaticGuards:
     def test_voxly_refuses_harmful(self):
         """voxly.yaml must mention refusal of harmful/unsafe requests.
 
-        Safety guard semantic — checks that the personality prompt contains
+        Safety guard semantic - checks that the personality prompt contains
         explicit safety boundary language (EN or TR).
         """
         voxly = Path(__file__).parent.parent / "config" / "personalities" / "voxly.yaml"
@@ -437,6 +437,6 @@ class TestSprint1StaticGuards:
         # Turkish safety keywords (if prompt is ever translated)
         tr_safety = any(w in content for w in ["reddet", "zararlı", "güvenli değil", "yasa dışı", "tehlikeli"])
         assert en_safety or tr_safety, (
-            "voxly.yaml must contain safety/refusal guard — "
+            "voxly.yaml must contain safety/refusal guard - "
             "neither English nor Turkish safety keywords found"
         )

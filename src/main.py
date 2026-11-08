@@ -1,7 +1,7 @@
 """
-VoxDesk — Main FastAPI Application
+VoxDesk - Main FastAPI Application
 Entry point that wires all components together.
-Binds to 127.0.0.1 only — no external network access.
+Binds to 127.0.0.1 only - no external network access.
 """
 
 from __future__ import annotations
@@ -31,7 +31,7 @@ from src.websocket_manager import ConnectionManager
 from src.hotkey import HotkeyManager
 from src.tray import TrayIcon
 
-# Version — single source from pyproject.toml
+# Version - single source from pyproject.toml
 _pyproject = Path(__file__).parent.parent / "pyproject.toml"
 try:
     with open(_pyproject, "rb") as _f:
@@ -42,7 +42,7 @@ except Exception:
 # Logging setup
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s [%(name)s] %(levelname)s — %(message)s",
+    format="%(asctime)s [%(name)s] %(levelname)s - %(message)s",
     datefmt="%H:%M:%S",
 )
 logger = logging.getLogger("voxdesk")
@@ -64,7 +64,7 @@ class AppState:
     hotkey_manager: HotkeyManager | None = None
     tray: TrayIcon | None = None
     sidecar: "SidecarManager | None" = None  # Sprint 8: local llama-server sidecar
-    # Sprint 8.1: Declared runtime toggles — replaces ad-hoc getattr patterns
+    # Sprint 8.1: Declared runtime toggles - replaces ad-hoc getattr patterns
     screen_context_enabled: bool = True      # Screen capture ON/OFF for LLM context
     voice_activation_enabled: bool = True     # Voice activation ON/OFF
     # Sprint 3: last error tracking for DEV HUD
@@ -72,7 +72,7 @@ class AppState:
     _last_error_time: float | None = None
 
     def record_error(self, error: str) -> None:
-        """Son hatayı kaydet — DEV HUD ve /api/status için."""
+        """Son hatayı kaydet - DEV HUD ve /api/status için."""
         self._last_error = error
         self._last_error_time = time.time()
 
@@ -96,7 +96,7 @@ async def lifespan(app: FastAPI):
     config = get_config()
 
     logger.info("=" * 60)
-    logger.info(f"  🌐 VoxDesk — Local AI Desktop Assistant v{APP_VERSION}")
+    logger.info(f"  🌐 VoxDesk - Local AI Desktop Assistant v{APP_VERSION}")
     logger.info(f"  📍 http://{config.host}:{config.port}")
     logger.info("=" * 60)
 
@@ -107,19 +107,19 @@ async def lifespan(app: FastAPI):
     # 2. State oluştur
     _state = AppState(config=config)
 
-    # 3. Registry — factory catalog'u oluştur
+    # 3. Registry - factory catalog'u oluştur
     _register_default_factories(_state.registry, config.vram)
     logger.info(f"  📦 Registry: {len(_state.registry.list_modules())} kind kaydedildi")
 
-    # 4. Bileşenleri oluştur (registry.create — startup'ta BİR KEZ)
+    # 4. Bileşenleri oluştur (registry.create - startup'ta BİR KEZ)
     try:
-        # Capture — registry üzerinden
+        # Capture - registry üzerinden
         _state.capture = _state.registry.create(
             "capture", config.capture.backend, config.capture
         )
         _state.capture.start()
 
-        # LLM — degraded mode if model missing
+        # LLM - degraded mode if model missing
         try:
             if config.llm.provider == "local-llama-server":
                 # Sprint 8: Local llama-server sidecar provider
@@ -128,7 +128,7 @@ async def lifespan(app: FastAPI):
 
                 server_cfg = config.local_llama_server
                 if not server_cfg.enabled:
-                    logger.warning("  ⚠️ local_llama_server disabled in config — LLM unavailable")
+                    logger.warning("  ⚠️ local_llama_server disabled in config - LLM unavailable")
                     _state.llm = None
                 else:
                     # Start sidecar if auto_start
@@ -147,7 +147,7 @@ async def lifespan(app: FastAPI):
                     if is_healthy:
                         logger.info(f"  🤖 Local server: {server_cfg.model_path} ({vision_status})")
                     else:
-                        logger.warning(f"  ⚠️ Local server not reachable — LLM degraded")
+                        logger.warning(f"  ⚠️ Local server not reachable - LLM degraded")
             else:
                 _state.llm = _state.registry.create(
                     "llm", config.llm.provider, config.llm
@@ -161,19 +161,19 @@ async def lifespan(app: FastAPI):
             logger.error(f"  ❌ LLM load error (degraded mode): {e}")
             _state.llm = None
 
-        # STT — registry üzerinden
+        # STT - registry üzerinden
         _state.stt = _state.registry.create(
             "stt", config.stt.engine, config.stt
         )
         logger.info(f"  🎤 STT: {config.stt.model}")
 
-        # TTS — registry üzerinden
+        # TTS - registry üzerinden
         _state.tts = _state.registry.create(
             "tts", config.tts.engine, config.tts
         )
         logger.info(f"  🔊 TTS: {config.tts.voice}")
 
-        # Translator — degraded mode if model missing
+        # Translator - degraded mode if model missing
         try:
             _state.translator = _state.registry.create(
                 "translator", config.translator.engine, config.translator
@@ -192,7 +192,7 @@ async def lifespan(app: FastAPI):
         # Sprint 3.5: ws_manager Origin allowlist injection
         _state.ws_manager.set_allowed_origins(config.network.allowed_ws_origins)
 
-        # 5. VRAM Manager — model lifecycle koordinasyonu
+        # 5. VRAM Manager - model lifecycle koordinasyonu
         _state.vram_manager = VRAMManager(
             metrics=_state.metrics,
             idle_timeout_seconds=config.vram.stt_idle_unload_seconds,
@@ -221,24 +221,24 @@ async def lifespan(app: FastAPI):
         else:
             logger.info("  📊 VRAM idle unload disabled by feature flag")
 
-        # Hotkeys — doğrudan (registry dışı, UI component)
+        # Hotkeys - doğrudan (registry dışı, UI component)
         _state.hotkey_manager = HotkeyManager(
             activate_key=config.hotkeys.activate,
             toggle_listen_key=config.hotkeys.toggle_listen,
             push_to_talk_key=config.hotkeys.push_to_talk,
             pin_screen_key=config.hotkeys.pin_screen,
         )
-        # Pin screen callback — hotkey'den capture.pin_current_frame() çağır
+        # Pin screen callback - hotkey'den capture.pin_current_frame() çağır
         if _state.capture:
             _state.hotkey_manager.set_callback(
                 "pin_screen", _state.capture.pin_current_frame
             )
         _state.hotkey_manager.start()
 
-        # System Tray — doğrudan (registry dışı, UI component)
+        # System Tray - doğrudan (registry dışı, UI component)
         def _tray_quit():
-            """Tray'den çıkış — uygulamayı tamamen kapat."""
-            logger.info("🛑 Tray quit triggered — shutting down...")
+            """Tray'den çıkış - uygulamayı tamamen kapat."""
+            logger.info("🛑 Tray quit triggered - shutting down...")
             import os
             import signal
             os.kill(os.getpid(), signal.SIGINT)
@@ -259,7 +259,7 @@ async def lifespan(app: FastAPI):
 
     yield  # Uygulama çalışıyor
 
-    # Shutdown — her bileşen izole try/except ile
+    # Shutdown - her bileşen izole try/except ile
     logger.info("🛑 VoxDesk shutting down...")
     await _safe_shutdown()
     logger.info("👋 Goodbye!")
@@ -293,7 +293,7 @@ def _register_default_factories(registry: ModuleRegistry, vram: "VRAMConfig | No
         description="dxcam screen capture",
     )
 
-    # LLM — llama-cpp-python local GGUF provider
+    # LLM - llama-cpp-python local GGUF provider
     registry.register(
         "llm", "llama-cpp",
         lambda cfg: LlamaCppProvider(cfg),
@@ -337,7 +337,7 @@ def _register_default_factories(registry: ModuleRegistry, vram: "VRAMConfig | No
         description="Kokoro TTS",
     )
 
-    # Translator — MarianMT TR→EN
+    # Translator - MarianMT TR→EN
     registry.register(
         "translator", "marian",
         lambda cfg: Translator(
@@ -358,7 +358,7 @@ def _register_default_factories(registry: ModuleRegistry, vram: "VRAMConfig | No
 async def _safe_shutdown() -> None:
     """
     Tüm bileşenleri güvenli şekilde kapat.
-    Her bileşen izole try/except ile — bir hata diğerlerini engellemez.
+    Her bileşen izole try/except ile - bir hata diğerlerini engellemez.
     """
     if _state is None:
         return
@@ -436,12 +436,12 @@ async def _safe_shutdown() -> None:
 # FastAPI App
 app = FastAPI(
     title="VoxDesk",
-    description="Local AI Desktop Assistant — Screen Analysis + Voice Chat",
+    description="Local AI Desktop Assistant - Screen Analysis + Voice Chat",
     version=APP_VERSION,
     lifespan=lifespan,
 )
 
-# CORS — sadece localhost, port config'ten
+# CORS - sadece localhost, port config'ten
 _cors_port = get_config().port
 app.add_middleware(
     CORSMiddleware,
@@ -470,7 +470,7 @@ app.include_router(voice_v2_router)
 
 @app.get("/")
 async def root():
-    """Ana sayfa — frontend'e yönlendir."""
+    """Ana sayfa - frontend'e yönlendir."""
     from fastapi.responses import FileResponse
     index = frontend_dir / "index.html"
     if index.exists():
@@ -480,7 +480,7 @@ async def root():
 
 @app.get("/api/health")
 async def health():
-    """Public health — minimal, safe to expose."""
+    """Public health - minimal, safe to expose."""
     state = get_app_state()
     degraded = False
     status = "ok"
@@ -503,13 +503,13 @@ async def health():
 
 @app.get("/api/status")
 async def runtime_status():
-    """Runtime status — safe model/capture/connections/features snapshot."""
+    """Runtime status - safe model/capture/connections/features snapshot."""
     import time
 
     state = get_app_state()
     config = state.config
 
-    # API section — mirrors health but nested
+    # API section - mirrors health but nested
     degraded = False
     api_status = "ok"
     if state.capture and not state.capture.is_running:
@@ -542,7 +542,7 @@ async def runtime_status():
             "state": "connected" if count > 0 else "idle",
         }
 
-    # Models section — safe name + state, no paths
+    # Models section - safe name + state, no paths
     def _model_info(subsystem, name_attr: str) -> dict:
         if subsystem is None:
             return {"name": None, "state": "UNAVAILABLE"}
@@ -565,7 +565,7 @@ async def runtime_status():
         "translator": _model_info(state.translator, "model_path"),
     }
 
-    # LLM provider info — honest vision capability reporting
+    # LLM provider info - honest vision capability reporting
     llm_provider_info = {
         "provider": config.llm.provider,
         "has_vision": state.llm.has_vision if state.llm else False,
@@ -580,10 +580,10 @@ async def runtime_status():
             "healthy": state.sidecar.is_healthy,
         }
 
-    # Screen context status — declared AppState field (Sprint 8.1)
+    # Screen context status - declared AppState field (Sprint 8.1)
     screen_ctx_enabled = state.screen_context_enabled
 
-    # Features — booleans only from config
+    # Features - booleans only from config
     features = {
         "enable_module_registry": config.features.enable_module_registry,
         "enable_vram_unload": config.features.enable_vram_unload,
@@ -615,7 +615,7 @@ async def runtime_status():
 @app.get("/api/debug/metrics")
 async def debug_metrics():
     """
-    Detailed debug metrics — localhost-only in dev.
+    Detailed debug metrics - localhost-only in dev.
     Controlled by features.enable_debug_metrics in prod.
     Contains process-local metrics, NOT nvidia-smi.
     """
@@ -675,7 +675,7 @@ def main():
 
     uvicorn.run(
         "src.main:app",
-        host=config.host,  # 127.0.0.1 — sadece lokal
+        host=config.host,  # 127.0.0.1 - sadece lokal
         port=config.port,
         reload=config.debug,
         log_level="info",

@@ -1,10 +1,10 @@
 """
-VoxDesk — Image Metadata
+VoxDesk - Image Metadata
 Tüm image source'lar için ortak metadata yapısı.
 Upload, capture, pinned frame, voice screen aynı formatta metadata üretir.
 
 Design:
-  - ImageMetadata: immutable dataclass — source, resolution, format, hash
+  - ImageMetadata: immutable dataclass - source, resolution, format, hash
   - build_image_metadata(): factory helper
   - log_image_context(): inference öncesi safe log
   - export_debug_frame(): debug frame export (flag-gated)
@@ -41,7 +41,7 @@ class ImageMetadata:
 
 
 def _compute_hash_prefix(data: bytes, length: int = 8) -> str:
-    """SHA256 hash'in ilk N hex karakteri — deterministic, hızlı."""
+    """SHA256 hash'in ilk N hex karakteri - deterministic, hızlı."""
     return hashlib.sha256(data).hexdigest()[:length]
 
 
@@ -126,7 +126,7 @@ def build_image_metadata(
 def log_image_context(meta: ImageMetadata) -> None:
     """
     LLM inference öncesi image context logla.
-    Safe: path/secret/env leak yok — sadece metadata.
+    Safe: path/secret/env leak yok - sadece metadata.
     """
     orig = (
         f"{meta.original_width}x{meta.original_height}"
@@ -152,11 +152,11 @@ def export_debug_frame(
     export_dir: str | Path = "data/debug_frames",
 ) -> str | None:
     """
-    Debug frame export — modele giden gerçek bytes'ı diske yaz.
+    Debug frame export - modele giden gerçek bytes'ı diske yaz.
     Caller enable_debug_capture_export flag'i kontrol etmeli.
 
     Returns:
-        Yazılan dosya adı (basename only — path leak yok), veya None.
+        Yazılan dosya adı (basename only - path leak yok), veya None.
     """
     try:
         export_path = Path(export_dir)

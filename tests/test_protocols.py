@@ -1,5 +1,5 @@
 """
-VoxDesk — Protocol Compliance Tests
+VoxDesk - Protocol Compliance Tests
 Mevcut engine class'larının Protocol contract'larına uyduğunu doğrular.
 runtime_checkable + structural typing ile isinstance check.
 """
@@ -33,7 +33,7 @@ class TestProtocolDefinitions:
 
         # runtime_checkable decorator uygulanmış mı
         assert hasattr(STTEngine, '__protocol_attrs__') or hasattr(STTEngine, '__abstractmethods__') or True
-        # isinstance ile kullanılabilmeli — duck typing check
+        # isinstance ile kullanılabilmeli - duck typing check
         # Boş class fail etmeli
         class Empty:
             pass
@@ -72,19 +72,19 @@ class TestSTTProtocol:
     def test_stt_close_method_needed(self):
         """
         SpeechRecognizer henüz close() method'u yok.
-        Phase 3 kapsamında eklenecek — bu test şimdilik bunu belgeliyor.
+        Phase 3 kapsamında eklenecek - bu test şimdilik bunu belgeliyor.
         """
         from src.stt import SpeechRecognizer
         stt = SpeechRecognizer(activation_threshold_db=-30.0)
-        # close() ve health() henüz eklenmedi — Phase 3'te eklenecek
+        # close() ve health() henüz eklenmedi - Phase 3'te eklenecek
         has_close = hasattr(stt, "close")
         has_health = hasattr(stt, "health")
-        # Şimdilik sadece kayıt altına al — fail etmemeli
+        # Şimdilik sadece kayıt altına al - fail etmemeli
         # Phase 3 tamamlanınca bu test isinstance check'e dönüşecek
         if not has_close:
-            pytest.skip("SpeechRecognizer.close() henüz yok — Phase 3'te eklenecek")
+            pytest.skip("SpeechRecognizer.close() henüz yok - Phase 3'te eklenecek")
         if not has_health:
-            pytest.skip("SpeechRecognizer.health() henüz yok — Phase 3'te eklenecek")
+            pytest.skip("SpeechRecognizer.health() henüz yok - Phase 3'te eklenecek")
 
 
 # ══════════════════════════════════════════════════════════════
@@ -132,9 +132,9 @@ class TestTTSProtocol:
         has_close = hasattr(tts, "close")
         has_health = hasattr(tts, "health")
         if not has_close:
-            pytest.skip("VoiceSynth.close() henüz yok — Phase 3'te eklenecek")
+            pytest.skip("VoiceSynth.close() henüz yok - Phase 3'te eklenecek")
         if not has_health:
-            pytest.skip("VoiceSynth.health() henüz yok — Phase 3'te eklenecek")
+            pytest.skip("VoiceSynth.health() henüz yok - Phase 3'te eklenecek")
 
 
 # ══════════════════════════════════════════════════════════════
@@ -174,7 +174,7 @@ class TestCaptureProtocol:
         has_close = hasattr(cap, "close")
         has_health = hasattr(cap, "health")
         if not has_close:
-            pytest.skip("ScreenCapture.close() henüz yok — Phase 3'te eklenecek")
+            pytest.skip("ScreenCapture.close() henüz yok - Phase 3'te eklenecek")
 
 
 # ══════════════════════════════════════════════════════════════
@@ -207,7 +207,7 @@ class TestLLMProtocol:
         has_aclose = hasattr(llm, "aclose")
         has_health = hasattr(llm, "health")
         if not has_aclose:
-            pytest.skip("LlamaCppProvider.aclose() henüz yok — Phase 3'te eklenecek")
+            pytest.skip("LlamaCppProvider.aclose() henüz yok - Phase 3'te eklenecek")
 
     @pytest.mark.unit
     def test_llm_response_mode_in_protocol(self):

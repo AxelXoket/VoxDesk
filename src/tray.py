@@ -1,5 +1,5 @@
 """
-VoxDesk — System Tray Icon
+VoxDesk - System Tray Icon
 Arka planda çalışma, sağ-tık menüsü.
 """
 
@@ -31,7 +31,7 @@ class TrayIcon:
         img = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
         draw = ImageDraw.Draw(img)
 
-        # Cyan circle — VoxDesk brand color
+        # Cyan circle - VoxDesk brand color
         draw.ellipse([4, 4, 60, 60], fill=(0, 245, 255, 255))
         # İç daire
         draw.ellipse([16, 16, 48, 48], fill=(0, 0, 0, 255))
@@ -59,7 +59,7 @@ class TrayIcon:
                 MenuItem("Quit", lambda icon, item: self._quit()),
             )
 
-            self._icon = pystray.Icon("voxdesk", icon_image, "VoxDesk — AI Assistant", menu)
+            self._icon = pystray.Icon("voxdesk", icon_image, "VoxDesk - AI Assistant", menu)
             self._icon.run()
 
         except Exception as e:

@@ -1,7 +1,7 @@
 ﻿"""
-VoxDesk — Audio Binary Protocol Tests
+VoxDesk - Audio Binary Protocol Tests
 Protocol constants, validation, handshake, session state.
-Gerçek mikrofon/audio KULLANILMAZ — pure unit tests.
+Gerçek mikrofon/audio KULLANILMAZ - pure unit tests.
 """
 
 import json
@@ -323,7 +323,7 @@ class TestAudioSession:
         assert session.sequence == 0
         assert session.total_bytes == 0
         assert session.total_chunks == 0
-        # handshake_done korunur — session devam eder
+        # handshake_done korunur - session devam eder
 
     @pytest.mark.unit
     def test_binary_before_handshake_detectable(self):

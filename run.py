@@ -1,5 +1,5 @@
 """
-VoxDesk — One-Click Launcher
+VoxDesk - One-Click Launcher
 Start the application with a single command.
 """
 
@@ -12,7 +12,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 def main():
     print()
-    print("  🌐 VoxDesk — Local AI Desktop Assistant")
+    print("  🌐 VoxDesk - Local AI Desktop Assistant")
     print("  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     print()
 

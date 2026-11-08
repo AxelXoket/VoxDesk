@@ -1,5 +1,5 @@
 """
-VoxDesk — Text-to-Speech Module
+VoxDesk - Text-to-Speech Module
 Kokoro TTS ile İngilizce ses sentezi.
 28+ ses profili, ses karıştırma, streaming chunk desteği.
 ManagedModel lifecycle entegrasyonu ile güvenli VRAM yönetimi.
@@ -55,7 +55,7 @@ class VoiceSynth:
         self._pipeline = None
         self._sample_rate = 24000
 
-        # Lifecycle — ManagedModel composition
+        # Lifecycle - ManagedModel composition
         self._lifecycle = _TTSLifecycle(
             owner=self,
             name="tts",
@@ -79,7 +79,7 @@ class VoiceSynth:
 
         # Ref count guard
         if not self._lifecycle.acquire():
-            logger.error("TTS model hazır değil — sentez iptal")
+            logger.error("TTS model hazır değil - sentez iptal")
             return None
 
         try:
@@ -111,7 +111,7 @@ class VoiceSynth:
 
     def synthesize_stream(self, text: str):
         """
-        Streaming ses sentezi — chunk chunk yield et.
+        Streaming ses sentezi - chunk chunk yield et.
         Düşük latency için ilk chunk hemen gönderilir.
 
         Yields:
@@ -122,7 +122,7 @@ class VoiceSynth:
 
         # Ref count guard
         if not self._lifecycle.acquire():
-            logger.error("TTS model hazır değil — stream iptal")
+            logger.error("TTS model hazır değil - stream iptal")
             return
 
         try:
@@ -169,7 +169,7 @@ class VoiceSynth:
         return self._lifecycle.safe_unload()
 
     def close(self) -> None:
-        """Shutdown cleanup — pipeline + cache."""
+        """Shutdown cleanup - pipeline + cache."""
         self._lifecycle.close()
 
     def health(self) -> dict:
@@ -180,11 +180,11 @@ class VoiceSynth:
         return h
 
     def acquire(self) -> bool:
-        """Ref count artır — aktif kullanım başlıyor."""
+        """Ref count artır - aktif kullanım başlıyor."""
         return self._lifecycle.acquire()
 
     def release(self) -> None:
-        """Ref count azalt — aktif kullanım bitti."""
+        """Ref count azalt - aktif kullanım bitti."""
         self._lifecycle.release()
 
 
@@ -204,7 +204,7 @@ class _TTSLifecycle(ManagedModel):
         pipeline = KPipeline(lang_code=self._owner.lang_code)
         self._owner._pipeline = pipeline
         logger.info(
-            f"✅ Kokoro TTS başlatıldı — "
+            f"✅ Kokoro TTS başlatıldı - "
             f"ses: {self._owner.voice}, lang: {self._owner.lang_code}"
         )
         return pipeline

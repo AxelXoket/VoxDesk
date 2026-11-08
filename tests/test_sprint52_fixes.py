@@ -1,6 +1,6 @@
 """
-VoxDesk — Sprint 5.2 Fix Verification Tests
-Her fix için targeted regression test — audit triage sonrası kanıtlama.
+VoxDesk - Sprint 5.2 Fix Verification Tests
+Her fix için targeted regression test - audit triage sonrası kanıtlama.
 
 Kapsamı:
   P1: Path leak, Origin bypass, DNS removal, base64 decode, PCM dtype, pyproject guard
@@ -47,7 +47,7 @@ class TestP1PathLeak:
             import asyncio
             from src.routes.settings import get_settings
             result = asyncio.run(get_settings())
-            # Must be basename only — no directory separators
+            # Must be basename only - no directory separators
             assert "/" not in result.model
             assert "\\" not in result.model
             assert result.model == "qwen-vl-7b-Q8_0.gguf"
@@ -98,7 +98,7 @@ class TestP1IsolationPrivacy:
         import src.isolation as iso
         # _test_outbound_connection should not exist anymore
         assert not hasattr(iso, "_test_outbound_connection"), \
-            "Outbound connection test function still exists — privacy violation"
+            "Outbound connection test function still exists - privacy violation"
 
     def test_isolation_report_no_internet_blocked_key(self):
         """Report must not contain internet_blocked key."""
@@ -213,7 +213,7 @@ class TestP2HistoryFixes:
         assert "visual_memo" in exported[0]
 
     def test_auto_trim_no_insert_zero(self):
-        """BUG-094: _auto_trim must not use insert(0) — O(n²) fix."""
+        """BUG-094: _auto_trim must not use insert(0) - O(n²) fix."""
         source = Path("src/llm/history.py").read_text(encoding="utf-8")
         trim_start = source.find("def _auto_trim")
         trim_code = source[trim_start:source.find("\n    def ", trim_start+1)]
@@ -270,7 +270,7 @@ class TestP3FrontendFixes:
         assert "toggleTts" in source
 
     def test_va_toggle_removed_from_settings(self):
-        """Sprint 7.2b: vaToggle removed — settings.js must not reference it."""
+        """Sprint 7.2b: vaToggle removed - settings.js must not reference it."""
         source = Path("frontend/js/settings.js").read_text(encoding="utf-8")
         assert "vaToggle" not in source, "vaToggle still in settings.js"
 
@@ -294,7 +294,7 @@ class TestP4Infrastructure:
                 stripped = line.strip()
                 if "ws_manager.connect(" in stripped:
                     assert stripped.startswith("connected"), \
-                        f"{name}:{i+1} — connect() return not captured: {stripped}"
+                        f"{name}:{i+1} - connect() return not captured: {stripped}"
 
     def test_tts_toggle_endpoint_exists(self):
         """BUG-067: PUT /tts/toggle endpoint must exist."""
@@ -321,11 +321,11 @@ class TestP4Infrastructure:
 
 
 # ══════════════════════════════════════════════════════════════
-#  Voice+Screen — Now FIXED (Sprint 5.3 P1)
+#  Voice+Screen - Now FIXED (Sprint 5.3 P1)
 # ══════════════════════════════════════════════════════════════
 
 class TestVoiceScreenFixed:
-    """Voice+Screen mode TTS exception handling — Sprint 5.3 P1."""
+    """Voice+Screen mode TTS exception handling - Sprint 5.3 P1."""
 
     def test_ws_voice_tts_exception_now_caught(self):
         """TTS exception must be caught with try/except and send TTS_FAILED."""
@@ -347,7 +347,7 @@ class TestVoiceScreenFixed:
 # ══════════════════════════════════════════════════════════════
 
 class TestSprint53ModelLoadRace:
-    """P2: Model load race condition — Event-based wait."""
+    """P2: Model load race condition - Event-based wait."""
 
     def test_load_event_exists(self):
         from src.model_state import ManagedModel
