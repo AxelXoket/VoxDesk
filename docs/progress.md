@@ -481,7 +481,7 @@ First-ever local LLM inference on VoxDesk — no Ollama, no cloud, pure llama-cp
 - Downloaded `model-q6_k.gguf` (6.26 GB) — MiniCPM-V 4.5 Official Q6_K
 - Downloaded `mmproj-f16.gguf` (1.02 GB) — Vision projector (SigLip2-400M + 3D-Resampler)
 - Source: `openbmb/MiniCPM-V-4_5-gguf` (official HuggingFace repo)
-- `models/minicpm-v4.5-abliterated/` klasörü hazır, kullanıcı onayı bekleniyor
+- `models/minicpm-v4.5-abliterated/` klasörü hazır, indirmeye ben karar vereceğim
 
 **Config Update:**
 - `config/default.yaml` → `model_path` ve `mmproj_path` gerçek dosya yollarına güncellendi
@@ -508,7 +508,7 @@ First-ever local LLM inference on VoxDesk — no Ollama, no cloud, pure llama-cp
 
 **Next steps:**
 - 3D-Resampler vision testi (single image → multi-image → 6-frame temporal)
-- Abliterated model indirme (kullanıcı onayı ile)
+- Abliterated model indirme (benim kararımla)
 - End-to-end pipeline: STT → LLM (with screen) → TTS
 
 ---
